@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from functools import cached_property
-from Options import PerGameCommonOptions, StartInventoryPool, Choice, Range, OptionCounter
+from Options import PerGameCommonOptions, StartInventoryPool, Choice, Range, OptionCounter, Toggle
 from .items import item_table, TRAP_ID_START, TRAP_ID_END
 
 
@@ -73,6 +73,43 @@ class TrapWeights(OptionCounter):
         return list(self.value.keys()), list(self.value.values())
 
 
+class RandomizeOracleCost(Toggle):
+    """If enabled, the Skull Gem cost to unlock each Oracle Dark Jak power will be randomized per stage."""
+    display_name = "Randomize Oracle Cost"
+
+
+class OracleCostLevel0(Range):
+    """Skull Gem cost for the 1st Oracle trial (Dark Bomb) (vanilla: 25). Only used if Randomize Oracle Cost is enabled."""
+    display_name = "Oracle Cost - Dark Bomb"
+    range_start = 0
+    range_end = 100
+    default = 25
+
+
+class OracleCostLevel1(Range):
+    """Skull Gem cost for the 2nd Oracle trial (Dark Blast) (vanilla: 200). Only used if Randomize Oracle Cost is enabled."""
+    display_name = "Oracle Cost - Dark Blast"
+    range_start = 0
+    range_end = 100
+    default = 200
+
+
+class OracleCostLevel2(Range):
+    """Skull Gem cost for the 3rd Oracle trial (Dark Invincibility) (vanilla: 200). Only used if Randomize Oracle Cost is enabled."""
+    display_name = "Oracle Cost - Dark Invincibility"
+    range_start = 0
+    range_end = 100
+    default = 200
+
+
+class OracleCostLevel3(Range):
+    """Skull Gem cost for the 4th Oracle trial (Dark Giant) (vanilla: 100). Only used if Randomize Oracle Cost is enabled."""
+    display_name = "Oracle Cost - Dark Giant"
+    range_start = 0
+    range_end = 100
+    default = 100
+
+
 @dataclass
 class JakIIOptions(PerGameCommonOptions):
     jak_2_completion_condition: CompletionCondition
@@ -81,4 +118,9 @@ class JakIIOptions(PerGameCommonOptions):
     percent_filler_replaced_with_traps: PercentOfFillerItemsReplacedWithTraps
     trap_effect_duration: TrapEffectDuration
     trap_weights: TrapWeights
+    randomize_oracle_cost: RandomizeOracleCost
+    oracle_cost_level0: OracleCostLevel0
+    oracle_cost_level1: OracleCostLevel1
+    oracle_cost_level2: OracleCostLevel2
+    oracle_cost_level3: OracleCostLevel3
     start_inventory_from_pool: StartInventoryPool

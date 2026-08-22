@@ -3,11 +3,15 @@ import struct
 import sys
 from typing import ByteString, Callable
 import json
-from PyMemoryEditor import OpenProcess, PyMemoryEditorError
+try:
+    from PyMemoryEditor import OpenProcess, PyMemoryEditorError
+except ImportError:
+    from PyMemoryEditor import OpenProcess, ProcessNotFoundError
+    PyMemoryEditorError = ProcessNotFoundError
 from dataclasses import dataclass
 
 import Utils
-from worlds.jakii.locs.mission_locations import main_tasks_to_missions, side_tasks_to_missions
+from worlds.jakii.locs.mission_locations import main_tasks_to_missions, side_tasks_to_missions, get_item_id_by_feature_id
 from worlds.jakii.game_id import jak2_gk
 
 logger = logging.getLogger("Jak2MemoryReader")
@@ -63,8 +67,10 @@ next_side_mission_index_offset = offsets.define(sizeof_uint64)
 missions_checked_offset = offsets.define(sizeof_uint32, 75)
 side_missions_checked_offset = offsets.define(sizeof_uint32, 35)
 
-# Connection status (added in version 2)
-connection_status_offset = offsets.define(sizeof_uint32)  # ap-connection-status enum
+next_item_index_offset = offsets.define(sizeof_uint64)
+items_checked_offset = offsets.define(sizeof_uint32, 35)
+
+connection_status_offset = offsets.define(sizeof_uint32)
 slot_name_offset = offsets.define(sizeof_uint8, 16)
 slot_seed_offset = offsets.define(sizeof_uint8, 8)
 
@@ -197,7 +203,7 @@ class Jak2MemoryReader:
 
         if self.connected:
             try:
-                OpenProcess(name=jak2_gk)
+                OpenProcess(process_name=jak2_gk)
             except PyMemoryEditorError as e:
                 msg = (
                     f"Error reading game memory! (Did the game crash?)\n"
@@ -241,7 +247,7 @@ class Jak2MemoryReader:
 
     async def connect(self):
         try:
-            self.gk_process = OpenProcess(name=jak2_gk)  # The GOAL Kernel
+            self.gk_process = OpenProcess(process_name=jak2_gk)
             if self.gk_process:
                 logger.debug("Found the gk process: " + str(self.gk_process.pid))
             else:
@@ -378,6 +384,15 @@ class Jak2MemoryReader:
                             f"(location: {side_mission_id})"
                         )
 
+            next_item_idx = self.read_goal_address(next_item_index_offset, sizeof_uint64)
+            for i in range(int(next_item_idx)):
+                item_id = self.read_goal_address(items_checked_offset + (i * sizeof_uint32), sizeof_uint32)
+                item_location_id = get_item_id_by_feature_id(item_id)
+                logger.info(
+                    f"DEBUG LOOP i={i} item_id={item_id} item_location_id={item_location_id} in_outbox={item_location_id in self.location_outbox if item_location_id else 'N/A'}")
+                if item_location_id is not None and item_location_id not in self.location_outbox:
+                    self.location_outbox.append(item_location_id)
+                    logger.debug(f"Item checked! Raw game-feature ID: {item_id} -> Location ID: {item_location_id}")
             completed = self.read_goal_address(completed_offset, sizeof_uint8)
             if completed > 0 and not self.finished_game:
                 self.finished_game = True

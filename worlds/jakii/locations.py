@@ -9,5 +9,6 @@ class JakIILocation(Location):
 
 all_locations_table = {
     **{k: v for k, v in missions.main_mission_table.items()},
-    **{k: v for k, v in missions.side_mission_table.items()}
+    **{k: v for k, v in missions.side_mission_table.items()},
+    **{k: v for k, v in missions.item_check_table.items()},
 }

@@ -15,7 +15,14 @@ from typing import Awaitable
 
 # Misc imports
 import colorama
-from PyMemoryEditor import OpenProcess, ProcessNotFoundError, AmbiguousProcessNameError
+try:
+    from PyMemoryEditor import (OpenProcess, ProcessNotFoundError, AmbiguousProcessNameError,
+                                ProcessIDNotExistsError, ClosedProcess)
+except ImportError:
+    from PyMemoryEditor import OpenProcess, ProcessNotFoundError
+    AmbiguousProcessNameError = ProcessNotFoundError
+    ProcessIDNotExistsError = ProcessNotFoundError
+    ClosedProcess = ProcessNotFoundError
 
 # Archipelago imports
 import ModuleUpdate
@@ -82,7 +89,7 @@ class Jak2ClientCommandProcessor(ClientCommandProcessor):
 
 class Jak2Context(CommonContext):
     game = jak2_name
-    items_handling = 0b111  # Full item handling
+    items_handling = 0b111
     command_processor = Jak2ClientCommandProcessor
 
     # We'll need two agents working in tandem to handle two-way communication with the game.
@@ -158,7 +165,12 @@ class Jak2Context(CommonContext):
                     slot_data["trap_effect_duration"],
                     completion_type,
                     specific_mission_value,
-                    mission_count_value,))
+                    mission_count_value,
+                    slot_data.get("randomize_oracle_cost", 0),
+                    slot_data.get("oracle_cost_level0", 25),
+                    slot_data.get("oracle_cost_level1", 200),
+                    slot_data.get("oracle_cost_level2", 200),
+                    slot_data.get("oracle_cost_level3", 100),))
 
             # Tell the server if Deathlink is enabled or disabled in-game, allowing us to "remember" the user's choice.
             self.on_deathlink_toggle()
@@ -291,8 +303,7 @@ class Jak2Context(CommonContext):
             try:
                 await self.repl.main_tick()
                 await asyncio.sleep(0.1)
-            # the catch re-engages the repl loop, enabling the client to reconnect if the process is lost
-            except NoSuchProcess:
+            except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
                 logger.debug("Compiler process lost. Restarting Compiler loop.")
 
     async def run_memr_loop(self):
@@ -300,8 +311,7 @@ class Jak2Context(CommonContext):
             try:
                 await self.memr.main_tick()
                 await asyncio.sleep(0.1)
-            # the catch re-engages the memr loop, enabling the client to reconnect if the process is lost
-            except NoSuchProcess:
+            except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
                 logger.debug("Memory Reader process lost. Restarting Memory Reader loop.")
 
 
@@ -414,7 +424,7 @@ async def run_game(ctx: Jak2Context):
     # These may already be running. If they are not running, try to start them.
     gk_running = False
     try:
-        OpenProcess(name=jak2_gk)  # The GOAL Kernel
+        OpenProcess(process_name=jak2_gk)
         gk_running = True
     except ProcessNotFoundError:
         ctx.on_log_warn(logger, "Game not running, attempting to start.")
@@ -425,7 +435,7 @@ async def run_game(ctx: Jak2Context):
 
     goalc_running = False
     try:
-        OpenProcess(name=jak2_goalc)  # The GOAL Compiler and REPL
+        OpenProcess(process_name=jak2_goalc)
         goalc_running = True
     except ProcessNotFoundError:
         ctx.on_log_warn(logger, "Compiler not running, attempting to start.")

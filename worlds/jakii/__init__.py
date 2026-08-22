@@ -225,6 +225,11 @@ class JakIIWorld(World):
                                             "percent_filler_replaced_with_traps",
                                             "trap_effect_duration",
                                             "trap_weights",
+                                            "randomize_oracle_cost",
+                                            "oracle_cost_level0",
+                                            "oracle_cost_level1",
+                                            "oracle_cost_level2",
+                                            "oracle_cost_level3",
                                             )
         # Convert the AP mission_id to GOAL's task_id, since ap-verify-game-completed! compares against task_id.
         mission_id = options_dict["specific_mission_for_completion"]

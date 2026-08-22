@@ -8,7 +8,11 @@ from dataclasses import dataclass
 from queue import Queue
 from typing import Callable
 
-from PyMemoryEditor import OpenProcess, PyMemoryEditorError
+try:
+    from PyMemoryEditor import OpenProcess, PyMemoryEditorError
+except ImportError:
+    from PyMemoryEditor import OpenProcess, ProcessNotFoundError
+    PyMemoryEditorError = ProcessNotFoundError
 
 import asyncio
 from asyncio import StreamReader, StreamWriter, Lock
@@ -30,82 +34,12 @@ class JsonMessageData:
 
 ALLOWED_CHARACTERS = frozenset(
     {
-        "0",
-        "1",
-        "2",
-        "3",
-        "4",
-        "5",
-        "6",
-        "7",
-        "8",
-        "9",
-        "A",
-        "B",
-        "C",
-        "D",
-        "E",
-        "F",
-        "G",
-        "H",
-        "I",
-        "J",
-        "K",
-        "L",
-        "M",
-        "N",
-        "O",
-        "P",
-        "Q",
-        "R",
-        "S",
-        "T",
-        "U",
-        "V",
-        "W",
-        "X",
-        "Y",
-        "Z",
-        "a",
-        "b",
-        "c",
-        "d",
-        "e",
-        "f",
-        "g",
-        "h",
-        "i",
-        "j",
-        "k",
-        "l",
-        "m",
-        "n",
-        "o",
-        "p",
-        "q",
-        "r",
-        "s",
-        "t",
-        "u",
-        "v",
-        "w",
-        "x",
-        "y",
-        "z",
-        " ",
-        "!",
-        ":",
-        ",",
-        ".",
-        "/",
-        "?",
-        "-",
-        "=",
-        "+",
-        "'",
-        "(",
-        ")",
-        '"',
+        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+        "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
+        "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
+        "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
+        "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
+        " ", "!", ":", ",", ".", "/", "?", "-", "=", "+", "'", "(", ")", '"',
     }
 )
 
@@ -117,11 +51,10 @@ class Jak2ReplClient:
     writer: StreamWriter
     lock: Lock
     connected: bool = False
-    initiated_connect: bool = False  # Signals when user tells us to try reconnecting.
+    initiated_connect: bool = False
     received_deathlink: bool = False
 
-    # Variables to handle the title screen and initial game connection.
-    initial_item_count = -1  # Brand new games have 0 items, so initialize this to -1.
+    initial_item_count = -1
     received_initial_items = False
     processed_initial_items = False
 
@@ -184,8 +117,7 @@ class Jak2ReplClient:
 
         if self.connected:
             try:
-                # self.gk_process.read_bool(self.gk_process.base_address)  # Ping to see if it's alive.
-                OpenProcess(name=jak2_gk)
+                OpenProcess(process_name=jak2_gk)
             except PyMemoryEditorError as e:
                 msg = (
                     f"Error reading game memory! (Did the game crash?)\n"
@@ -201,8 +133,8 @@ class Jak2ReplClient:
                 logger.error(e)
                 self.connected = False
             try:
-                # self.goalc_process.read_bool(self.goalc_process.base_address)  # Ping to see if it's alive.
-                OpenProcess(name=jak2_goalc)
+                # Ping to see if it's alive.
+                OpenProcess(process_name=jak2_goalc)
             except PyMemoryEditorError as e:
                 msg = (
                     f"Error sending data to compiler! (Did the compiler crash?)\n"
@@ -284,7 +216,7 @@ class Jak2ReplClient:
 
     async def connect(self):
         try:
-            self.gk_process = OpenProcess(name=jak2_gk)  # The GOAL Kernel
+            self.gk_process = OpenProcess(process_name=jak2_gk)
             logger.debug("Found the gk process: " + str(self.gk_process.pid))
         except PyMemoryEditorError as e:
             self.log_error(logger, "Could not find the game process.")
@@ -292,7 +224,7 @@ class Jak2ReplClient:
             return
 
         try:
-            self.goalc_process = OpenProcess(name=jak2_goalc)  # The GOAL Compiler and REPL
+            self.goalc_process = OpenProcess(process_name=jak2_goalc)
             logger.debug("Found the goalc process: " + str(self.goalc_process.pid))
         except PyMemoryEditorError as e:
             self.log_error(logger, "Could not find the compiler process.")
@@ -470,7 +402,12 @@ class Jak2ReplClient:
                             trap_time: int,
                             completion_type: int,
                             specific_mission_value: int,
-                            mission_count_value: int) -> bool:
+                            mission_count_value: int,
+                            randomize_oracle_cost: int,
+                            oracle_cost_level0: int,
+                            oracle_cost_level1: int,
+                            oracle_cost_level2: int,
+                            oracle_cost_level3: int) -> bool:
         sanitized_name = self.sanitize_file_text(slot_name)
         sanitized_seed = self.sanitize_file_text(slot_seed)
 
@@ -480,14 +417,24 @@ class Jak2ReplClient:
                                   f":trap-duration {trap_time}.0 "
                                   f":completion-type {completion_type} "
                                   f":completion-value {specific_mission_value} "
-                                  f":completion-mission-count {mission_count_value}))")
+                                  f":completion-mission-count {mission_count_value} "
+                                  f":randomize-oracle-cost {randomize_oracle_cost} "
+                                  f":oracle-cost-level0 {oracle_cost_level0} "
+                                  f":oracle-cost-level1 {oracle_cost_level1} "
+                                  f":oracle-cost-level2 {oracle_cost_level2} "
+                                  f":oracle-cost-level3 {oracle_cost_level3}))")
         message = (f"Setting options: \n"
                    f"   Slot Name {sanitized_name}, \n"
                    f"   Slot Seed {sanitized_seed}, \n"
                    f"   Trap Duration {trap_time}, \n"
                    f"   Goal Type {completion_type}, \n"
                    f"   Specific Value {specific_mission_value}, \n"
-                   f"   Mission Count Value {mission_count_value}... ")
+                   f"   Mission Count Value {mission_count_value}, \n"
+                   f"   Randomize Oracle Cost {randomize_oracle_cost}, \n"
+                   f"   Oracle Cost Level0 {oracle_cost_level0}, \n"
+                   f"   Oracle Cost Level1 {oracle_cost_level1}, \n"
+                   f"   Oracle Cost Level2 {oracle_cost_level2}, \n"
+                   f"   Oracle Cost Level3 {oracle_cost_level3}... ")
         if ok:
             logger.debug(message + "Success!")
         else:
