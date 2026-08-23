@@ -8,18 +8,14 @@ from dataclasses import dataclass
 from queue import Queue
 from typing import Callable
 
-try:
-    from PyMemoryEditor import OpenProcess, PyMemoryEditorError
-except ImportError:
-    from PyMemoryEditor import OpenProcess, ProcessNotFoundError
-    PyMemoryEditorError = ProcessNotFoundError
+from PyMemoryEditor import OpenProcess, ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess
 
 import asyncio
 from asyncio import StreamReader, StreamWriter, Lock
 
 from NetUtils import NetworkItem
 from ..items import item_table, Jak2ItemData, TRAP_ID_START, TRAP_ID_END, ITEM_ID_FILLER_START, ITEM_ID_FILLER_END
-from worlds.jakii.game_id import jak2_gk, jak2_goalc
+from ..game_id import jak2_gk, jak2_goalc
 
 logger = logging.getLogger("Jak2ReplClient")
 
@@ -118,7 +114,7 @@ class Jak2ReplClient:
         if self.connected:
             try:
                 OpenProcess(process_name=jak2_gk)
-            except PyMemoryEditorError as e:
+            except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
                 msg = (
                     f"Error reading game memory! (Did the game crash?)\n"
                     f"Please close all open windows and reopen the Jak II Client "
@@ -130,12 +126,11 @@ class Jak2ReplClient:
                     f"   Then close and reopen the Jak II Client from the Archipelago Launcher."
                 )
                 self.log_error(logger, msg)
-                logger.error(e)
                 self.connected = False
             try:
                 # Ping to see if it's alive.
                 OpenProcess(process_name=jak2_goalc)
-            except PyMemoryEditorError as e:
+            except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
                 msg = (
                     f"Error sending data to compiler! (Did the compiler crash?)\n"
                     f"Please close all open windows and reopen the Jak II Client "
@@ -147,7 +142,6 @@ class Jak2ReplClient:
                     f"   Then close and reopen the Jak II Client from the Archipelago Launcher."
                 )
                 self.log_error(logger, msg)
-                logger.error(e)
                 self.connected = False
         else:
             return
@@ -203,10 +197,14 @@ class Jak2ReplClient:
             self.writer.write(header + form.encode())
             await self.writer.drain()
 
-            response_data = await self.reader.read(1024)
-            response = response_data.decode()
+            try:
+                response_data = await self.reader.read(1024)
+                response = response_data.decode()
+            except asyncio.TimeoutError:
+                self.log_error(logger, f"Timed out while waiting for REPL response to {form}")
+                return False
 
-            if "OK!" in response:
+            if response and len(response.strip()) > 0:
                 if print_ok:
                     logger.debug(response)
                 return True
@@ -218,17 +216,15 @@ class Jak2ReplClient:
         try:
             self.gk_process = OpenProcess(process_name=jak2_gk)
             logger.debug("Found the gk process: " + str(self.gk_process.pid))
-        except PyMemoryEditorError as e:
+        except ProcessNotFoundError:
             self.log_error(logger, "Could not find the game process.")
-            logger.error(e)
             return
 
         try:
             self.goalc_process = OpenProcess(process_name=jak2_goalc)
             logger.debug("Found the goalc process: " + str(self.goalc_process.pid))
-        except PyMemoryEditorError as e:
+        except ProcessNotFoundError:
             self.log_error(logger, "Could not find the compiler process.")
-            logger.error(e)
             return
 
         try:

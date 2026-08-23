@@ -90,7 +90,7 @@ class OracleCostLevel1(Range):
     """Skull Gem cost for the 2nd Oracle trial (Dark Blast) (vanilla: 200). Only used if Randomize Oracle Cost is enabled."""
     display_name = "Oracle Cost - Dark Blast"
     range_start = 0
-    range_end = 100
+    range_end = 200
     default = 200
 
 
@@ -98,7 +98,7 @@ class OracleCostLevel2(Range):
     """Skull Gem cost for the 3rd Oracle trial (Dark Invincibility) (vanilla: 200). Only used if Randomize Oracle Cost is enabled."""
     display_name = "Oracle Cost - Dark Invincibility"
     range_start = 0
-    range_end = 100
+    range_end = 200
     default = 200
 
 

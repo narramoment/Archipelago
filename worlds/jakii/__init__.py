@@ -46,7 +46,6 @@ components.append(Component("Jak II Client",
                             icon="jak2_icon"))
 
 
-# TODO: Add proper icon for Jak 2
 icon_paths["jak2_icon"] = f"ap:{__name__}/icons/jak2_icon.png"
 
 

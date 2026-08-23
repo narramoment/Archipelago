@@ -15,14 +15,10 @@ from typing import Awaitable
 
 # Misc imports
 import colorama
-try:
-    from PyMemoryEditor import (OpenProcess, ProcessNotFoundError, AmbiguousProcessNameError,
-                                ProcessIDNotExistsError, ClosedProcess)
-except ImportError:
-    from PyMemoryEditor import OpenProcess, ProcessNotFoundError
-    AmbiguousProcessNameError = ProcessNotFoundError
-    ProcessIDNotExistsError = ProcessNotFoundError
-    ClosedProcess = ProcessNotFoundError
+from psutil import NoSuchProcess
+
+import PyMemoryEditor
+from PyMemoryEditor import OpenProcess, ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess
 
 # Archipelago imports
 import ModuleUpdate
@@ -256,7 +252,7 @@ class Jak2Context(CommonContext):
     async def ap_inform_deathlink(self):
         if self.memr.deathlink_enabled:
             player = self.player_names[self.slot] if self.slot is not None else "Jak"
-            death_text = autopsy(self.memr.cause_of_death.replace).replace("Jak", player)
+            death_text = autopsy(self.memr.cause_of_death).replace("Jak", player)
             await self.send_death(death_text)
             self.on_log_warn(logger, death_text)
 
@@ -303,7 +299,7 @@ class Jak2Context(CommonContext):
             try:
                 await self.repl.main_tick()
                 await asyncio.sleep(0.1)
-            except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+            except NoSuchProcess:
                 logger.debug("Compiler process lost. Restarting Compiler loop.")
 
     async def run_memr_loop(self):
@@ -311,7 +307,7 @@ class Jak2Context(CommonContext):
             try:
                 await self.memr.main_tick()
                 await asyncio.sleep(0.1)
-            except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+            except NoSuchProcess:
                 logger.debug("Memory Reader process lost. Restarting Memory Reader loop.")
 
 
@@ -428,10 +424,6 @@ async def run_game(ctx: Jak2Context):
         gk_running = True
     except ProcessNotFoundError:
         ctx.on_log_warn(logger, "Game not running, attempting to start.")
-    except AmbiguousProcessNameError:
-        ctx.on_log_error(logger, "Two or more instances of the game were found.  "
-                                         "Please close one and restart this client.")
-        return
 
     goalc_running = False
     try:
@@ -439,10 +431,6 @@ async def run_game(ctx: Jak2Context):
         goalc_running = True
     except ProcessNotFoundError:
         ctx.on_log_warn(logger, "Compiler not running, attempting to start.")
-    except AmbiguousProcessNameError:
-        ctx.on_log_error(logger, "Two or more instances of the game were found.  "
-                                         "Please close one and restart this client.")
-        return
 
     try:
         auto_detect_root_directory = JakIIWorld.settings.auto_detect_root_directory
