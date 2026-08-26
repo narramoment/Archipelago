@@ -23,7 +23,7 @@ ITEM_ID_KEY_END = 33            # Key/progression items end at ID 33
 ITEM_ID_FILLER_START = 34       # Filler items start at ID 34 (Dark Eco Pill)
 ITEM_ID_FILLER_END = 39         # Standard filler items end at ID 39
 TRAP_ID_START = 40              # Trap items start at ID 40 (Trip Trap)
-TRAP_ID_END = 55                # Trap items end at ID 55
+TRAP_ID_END = 56                # Trap items end at ID 55
 
 # Unified Item Table - Single source of truth for all items
 # Every item is organized by classification using ID ranges defined above
@@ -85,7 +85,7 @@ item_table = {
     39: Jak2ItemData(item_id=39, name="Peacemaker Ammo", symbol="ammo-dark"),
 
     # Trap Items (IDs 40-56)
-    # Jak 1 Traps, Reimagined for Jak 2! (IDs 40-50)
+    # Jak 1 Traps, Reimagined for Jak 2! (IDs 40-51)
     40: Jak2ItemData(item_id=40, name="Trip Trap", symbol="trip"),
     41: Jak2ItemData(item_id=41, name="Slip Trap", symbol="ice-physics"),
     42: Jak2ItemData(item_id=42, name="Gravity Trap", symbol="the-big-apple"),
@@ -93,15 +93,16 @@ item_table = {
     44: Jak2ItemData(item_id=44, name="Darkness Trap", symbol="daredevil"),
     45: Jak2ItemData(item_id=45, name="Earthquake Trap", symbol="caseoh"),
     46: Jak2ItemData(item_id=46, name="Teleport Trap", symbol="instant-transmission"),
-    47: Jak2ItemData(item_id=47, name="Pacifism Trap", symbol="personal-bubble"),
-    48: Jak2ItemData(item_id=48, name="Health Trap", symbol="hit-by-bus"),
-    49: Jak2ItemData(item_id=49, name="Ledge Trap", symbol="rivals-of-aether"),
-    50: Jak2ItemData(item_id=50, name="Mirror Trap", symbol="man-in-the-mirror"),
+    47: Jak2ItemData(item_id=46, name="Despair Trap", symbol="emotional-damage"),
+    48: Jak2ItemData(item_id=48, name="Pacifism Trap", symbol="personal-bubble"),
+    49: Jak2ItemData(item_id=49, name="Health Trap", symbol="hit-by-bus"),
+    50: Jak2ItemData(item_id=50, name="Ledge Trap", symbol="rivals-of-aether"),
+    51: Jak2ItemData(item_id=51, name="Mirror Trap", symbol="man-in-the-mirror"),
 
-    # Brand New Jak 2 Traps! (IDs 51-55)
-    51: Jak2ItemData(item_id=51, name="High Alert Trap", symbol="five-star"),
-    52: Jak2ItemData(item_id=52, name="Ammo Trap", symbol="russian-roulette"),
-    53: Jak2ItemData(item_id=53, name="Dark Trap", symbol="anger-issues"),
-    54: Jak2ItemData(item_id=54, name="Hero Trap", symbol="hardcore"),
-    55: Jak2ItemData(item_id=56, name="Reverse Trap", symbol="turn-right-to-go-left")
+    # Brand New Jak 2 Traps! (IDs 52-56)
+    52: Jak2ItemData(item_id=52, name="High Alert Trap", symbol="five-star"),
+    53: Jak2ItemData(item_id=53, name="Ammo Trap", symbol="russian-roulette"),
+    54: Jak2ItemData(item_id=54, name="Dark Trap", symbol="anger-issues"),
+    55: Jak2ItemData(item_id=55, name="Hero Trap", symbol="hardcore"),
+    56: Jak2ItemData(item_id=56, name="Reverse Trap", symbol="turn-right-to-go-left")
 }
