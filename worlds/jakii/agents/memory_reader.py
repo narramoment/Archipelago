@@ -1,13 +1,18 @@
 import logging
 import struct
+import sys
 from typing import ByteString, Callable
 import json
-import pymem
-from pymem import pattern
-from pymem.exception import ProcessNotFound, ProcessError, MemoryReadError, WinAPIError
+from PyMemoryEditor import OpenProcess, ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess
 from dataclasses import dataclass
 
-from worlds.jakii.locs.mission_locations import main_tasks_to_missions, side_tasks_to_missions
+from pymem.exception import WinAPIError
+
+import Utils
+from worlds.jakii.locs.mission_locations import (main_tasks_to_missions,
+                                                 side_tasks_to_missions,
+                                                 get_item_id_by_feature_id)
+from ..game_id import jak2_gk
 
 logger = logging.getLogger("Jak2MemoryReader")
 
@@ -22,7 +27,7 @@ sizeof_float = 4
 # *****************************************************************************
 # **** This number must match (-> *ap-info-jak2* version) in ap-struct.gc! ****
 # *****************************************************************************
-expected_memory_version = 4
+expected_memory_version = 5
 
 
 # IMPORTANT: OpenGOAL memory structures are particular about the alignment, in memory, of member elements according to
@@ -38,22 +43,17 @@ class OffsetFactory:
         # If necessary, align current_offset to the current size first.
         bytes_to_alignment = self.current_offset % size
         if bytes_to_alignment != 0:
-            self.current_offset += (size - bytes_to_alignment)
+            self.current_offset += size - bytes_to_alignment
 
         # Increment current_offset so the next definition can be made.
         offset_to_use = self.current_offset
-        self.current_offset += (size * length)
+        self.current_offset += size * length
         return offset_to_use
 
 
 # Start defining important memory address offsets here. They must be in the same order, have the same sizes, and have
 # the same lengths, as defined in `ap-info-jak2`.
 offsets = OffsetFactory()
-
-# Deathlink Information
-# death_count_offset = offsets.define(sizeof_uint32)
-# death_cause_offset = offsets.define(sizeof_uint8)
-# deathlink_enabled_offset = offsets.define(sizeof_uint8)
 
 # Memory version (uint32 in GOAL)
 memory_version_offset = offsets.define(sizeof_uint32)
@@ -67,16 +67,30 @@ next_side_mission_index_offset = offsets.define(sizeof_uint64)
 missions_checked_offset = offsets.define(sizeof_uint32, 75)
 side_missions_checked_offset = offsets.define(sizeof_uint32, 35)
 
-# Connection status (added in version 2)
-connection_status_offset = offsets.define(sizeof_uint32)  # ap-connection-status enum
+next_item_index_offset = offsets.define(sizeof_uint64)
+items_checked_offset = offsets.define(sizeof_uint32, 35)
+
+connection_status_offset = offsets.define(sizeof_uint32)
+slot_name_offset = offsets.define(sizeof_uint8, 16)
+slot_seed_offset = offsets.define(sizeof_uint8, 8)
 
 # Completion Information
+completion_goal_offset = offsets.define(sizeof_uint8)
 completion_goal_type_offset = offsets.define(sizeof_uint32)
 completion_goal_value_offset = offsets.define(sizeof_uint32)
 completed_offset = offsets.define(sizeof_uint8)
 
+# Deathlink Information
+death_count_offset = offsets.define(sizeof_uint32)
+death_cause_offset = offsets.define(sizeof_uint8)
+deathlink_enabled_offset = offsets.define(sizeof_uint8)
+
 # Trap Information
 trap_duration_offset = offsets.define(sizeof_float)
+
+# Item Replay Information
+needs_item_replay_offset = offsets.define(sizeof_uint8)
+initial_replay_done_offset = offsets.define(sizeof_uint8)
 
 # End marker (uint8 array of 4 bytes - "end\0")
 end_marker_offset = offsets.define(sizeof_uint8, 4)
@@ -84,53 +98,49 @@ end_marker_offset = offsets.define(sizeof_uint8, 4)
 
 # Can't believe this is easier to do in GOAL than Python but that's how it be sometimes.
 def as_float(value: int) -> int:
-    return int(struct.unpack('f', value.to_bytes(sizeof_float, "little"))[0])
+    return int(struct.unpack("f", value.to_bytes(sizeof_float, "little"))[0])
 
-#def autopsy(cause: int) -> str:
-#    if cause in[1, 2, 3, 4]:
-#        return random.choice(["Jak said goodnight.",
-#                              "Jak stepped into the light.",
-#                              "Jak gave Daxter his insect collection.",
-#                              "Jak didn't follow step 1."])
-#    if cause == 5:
-#        return "Jak couldn't hang with the robots."
-#    if cause == 6:
-#        return "Jak was turned into an egg!"
-#    if cause == 7:
-#        return "Jak never found the ground."
-#    if cause == 8:
-#        return "Jak had a skill issue."
-#    if cause == 9:
-#        return "Jak hit 2000 degrees."
-#    if cause == 10:
-#        return "Jak reached their melting point."
-#    if cause == 11:
-#        return "Jak exploded."
-#    if cause == 12:
-#        return "Jak exploded big."
-#    if cause == 13:
-#        return "Jak was gunned down."
-#    if cause == 14:
-#        return "Jak hit the ground too hard."
-#    if cause == 15:
-#        return "Jak got hit a little too hard."
-#    if cause == 16:
-#        return "Jak forgot to wear insulated gloves."
-#    if cause == 17:
-#        return "Jak was crushed."
-#    if cause == 18:
-#        return "Jak... is gone. :("
-#    if cause == 19:
-#        return "Jak exploded :("
-#    if cause == 20:
-#        return "Jak ran out of air."
-#    if cause == 21:
-#        return "Jak couldn't handle the heat."
-#    if cause == 22:
-#        return "Jak was torched."
-#    if cause == 23:
-#        return "Jak failed the mission."
-#    return "Jak died."
+def autopsy(cause: int) -> str:
+    if cause == 5:
+        return "Jak couldn't hang with the robots."
+    if cause == 6:
+        return "Jak was turned into an egg!"
+    if cause == 7:
+        return "Jak never found the ground."
+    if cause == 8:
+        return "Jak had a skill issue."
+    if cause == 9:
+        return "Jak hit 2000 degrees."
+    if cause == 10:
+        return "Jak reached their melting point."
+    if cause == 11:
+        return "Jak exploded."
+    if cause == 12:
+        return "Jak exploded big."
+    if cause == 13:
+        return "Jak was gunned down."
+    if cause == 14:
+        return "Jak got smushed."
+    if cause == 15:
+        return "Jak got hit a little too hard."
+    if cause == 16:
+        return "Jak forgot to wear insulated gloves."
+    if cause == 17:
+        return "Jak was crushed."
+    if cause == 18:
+        return "Jak... is gone. :("
+    if cause == 19:
+        return "Jak was exploded by a grenade."
+    if cause == 20:
+        return "Jak ran out of air."
+    if cause == 21:
+        return "Jak couldn't handle the heat."
+    if cause == 22:
+        return "Jak was torched."
+    if cause == 23:
+        return "Jak finally took a much needed bath, but in a bathtub filled with Dark Eco."
+    return "Jak died."
+
 
 class Jak2MemoryReader:
     marker: ByteString
@@ -139,36 +149,37 @@ class Jak2MemoryReader:
     initiated_connect: bool = False
 
     # The memory reader just needs the game running.
-    gk_process: pymem.process = None
+    gk_process: OpenProcess | None = None
 
     location_outbox: list[int] = []
     outbox_index: int = 0
     finished_game: bool = False
+    needs_item_replay: bool = False
 
     # Deathlink handling
-    # deathlink_enabled: bool = False
-    # send_deathlink: bool = False
-    # cause_of_death: str = ""
-    # death_count: int = 0
+    deathlink_enabled: bool = False
+    send_deathlink: bool = False
+    cause_of_death: str = ""
+    death_count: int = 0
 
     # Game-related callbacks (inform the AP server of changes to game state)
     inform_checked_location: Callable
     inform_finished_game: Callable
     inform_died: Callable
-    # inform_toggled_deathlink: Callable
+    inform_toggled_deathlink: Callable
 
     # Logging callbacks
     # These will write to the provided logger, as well as the Client GUI with color markup.
-    log_error: Callable    # Red
-    log_warn: Callable     # Orange
+    log_error: Callable  # Red
+    log_warn: Callable  # Orange
     log_success: Callable  # Green
     log_info: Callable     # White (default)
 
     def __init__(self,
                  location_check_callback: Callable,
                  finish_game_callback: Callable,
-                 # send_deathlink_callback: Callable,
-                 # toggle_deathlink_callback: Callable,
+                 send_deathlink_callback: Callable,
+                 toggle_deathlink_callback: Callable,
                  log_error_callback: Callable,
                  log_warn_callback: Callable,
                  log_success_callback: Callable,
@@ -178,9 +189,8 @@ class Jak2MemoryReader:
 
         self.inform_checked_location = location_check_callback
         self.inform_finished_game = finish_game_callback
-        # self.inform_died = send_deathlink_callback
-        # self.inform_toggled_deathlink = toggle_deathlink_callback
-
+        self.inform_died = send_deathlink_callback
+        self.inform_toggled_deathlink = toggle_deathlink_callback
         self.log_error = log_error_callback
         self.log_warn = log_warn_callback
         self.log_success = log_success_callback
@@ -193,16 +203,18 @@ class Jak2MemoryReader:
 
         if self.connected:
             try:
-                self.gk_process.read_bool(self.gk_process.base_address)  # Ping to see if it's alive.
-            except (ProcessError, MemoryReadError, WinAPIError):
-                msg = (f"Error reading game memory! (Did the game crash?)\n"
-                       f"Please close all open windows and reopen the Jak II Client "
-                       f"from the Archipelago Launcher.\n"
-                       f"If the game and compiler do not restart automatically, please follow these steps:\n"
-                       f"   Run the OpenGOAL Launcher, click Jak II > Features > Mods > ArchipelaGOAL.\n"
-                       f"   Then click Advanced > Play in Debug Mode.\n"
-                       f"   Then click Advanced > Open REPL.\n"
-                       f"   Then close and reopen the Jak II Client from the Archipelago Launcher.")
+                OpenProcess(process_name=jak2_gk)
+            except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+                msg = (
+                    f"Error reading game memory! (Did the game crash?)\n"
+                    f"Please close all open windows and reopen the Jak II Client "
+                    f"from the Archipelago Launcher.\n"
+                    f"If the game and compiler do not restart automatically, please follow these steps:\n"
+                    f"   Run the OpenGOAL Launcher, click Jak II > Features > Mods > ArchipelaGOAL.\n"
+                    f"   Then click Advanced > Play in Debug Mode.\n"
+                    f"   Then click Advanced > Open REPL.\n"
+                    f"   Then close and reopen the Jak II Client from the Archipelago Launcher."
+                )
                 self.log_error(logger, msg)
                 self.connected = False
         else:
@@ -211,7 +223,7 @@ class Jak2MemoryReader:
         if self.connected:
 
             # Save some state variables temporarily.
-            # old_deathlink_enabled = self.deathlink_enabled
+            old_deathlink_enabled = self.deathlink_enabled
 
             # Read the memory address to check the state of the game.
             self.read_memory()
@@ -225,42 +237,43 @@ class Jak2MemoryReader:
             if self.finished_game:
                 self.inform_finished_game()
 
-            # if old_deathlink_enabled != self.deathlink_enabled:
-            #    self.inform_toggled_deathlink()
-            #    logger.debug("Toggled Deathlink " + ("ON" if self.deathlink_enabled else "OFF"))
+            if old_deathlink_enabled != self.deathlink_enabled:
+                self.inform_toggled_deathlink()
+                logger.debug("Toggled Deathlink " + ("ON" if self.deathlink_enabled else "OFF"))
 
-            #if self.send_deathlink:
-            #    self.inform_died()
+            if self.send_deathlink:
+                self.inform_died()
 
     async def connect(self):
         try:
-            self.gk_process = pymem.Pymem("gk.exe")  # The GOAL Kernel
-            logger.debug("Found the gk process: " + str(self.gk_process.process_id))
-        except ProcessNotFound:
+            self.gk_process = OpenProcess(process_name=jak2_gk)
+            if self.gk_process:
+                logger.debug("Found the gk process: " + str(self.gk_process.pid) if self.gk_process else None)
+            else:
+                return
+        except ProcessNotFoundError:
             self.log_error(logger, "Could not find the game process.")
             self.connected = False
             return
 
-        # If we don't find the marker in the first loaded module, we've failed.
-        modules = list(self.gk_process.list_modules())
-        logger.debug(f"Found {len(modules)} modules to search through.")
-        for i, module in enumerate(modules):
-            marker_address = pattern.pattern_scan_module(self.gk_process.process_handle, module, self.marker)
-            if marker_address:
-                # At this address is another address that contains the struct we're looking for: the game's state.
-                # From here we need to add the length in bytes for the marker and 4 bytes of padding,
-                # and the struct address is 8 bytes long (it's an uint64).
-                goal_pointer = marker_address + len(self.marker) + 7
-                self.goal_address = int.from_bytes(self.gk_process.read_bytes(goal_pointer, sizeof_uint64),
-                                                   byteorder="little",
-                                                   signed=False)
-                logger.debug("Found the archipelago memory address: " + str(self.goal_address))
-                await self.verify_memory_version()
-                break
-            else:
-                self.log_warn(logger, f"Could not find the Archipelago marker address in module {i}, continuing...")
+        marker_addresses = list(self.gk_process.search_by_value(bytes, len(self.marker), self.marker,
+                                                                writeable_only=True) if self.gk_process else [])
+        if len(marker_addresses) > 0:
+            # If we don't find the marker in the first loaded module, we've failed.
+            goal_pointer = marker_addresses[0] + len(self.marker) + 7
+
+            # At this address is another address that contains the struct we're looking for: the game's state.
+            # From here we need to add the length in bytes for the marker and 4 bytes of padding,
+            # and the struct address is 8 bytes long (it's an uint64).
+            self.goal_address = int.from_bytes(
+                self.gk_process.read_process_memory(goal_pointer, bytes, sizeof_uint64),
+                byteorder="little",
+                signed=False,
+            )
+            logger.debug("Found the archipelago memory address: " + str(self.goal_address))
+            await self.verify_memory_version()
         else:
-            self.log_warn(logger, f"Could not find the Archipelago marker address in any module!")
+            self.log_error(logger, "Could not find the Archipelago marker address!")
             self.connected = False
 
     async def verify_memory_version(self):
@@ -276,39 +289,45 @@ class Jak2MemoryReader:
                 self.log_success(logger, "The Memory Reader is ready!")
                 self.connected = True
             else:
-                raise MemoryReadError(memory_version_offset, sizeof_uint32)
-        except (ProcessError, MemoryReadError, WinAPIError):
+                raise Exception(memory_version_offset, sizeof_uint32)
+        except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
             if memory_version is None:
-                msg = (f"Could not find a version number in the OpenGOAL memory structure!\n"
-                       f"   Expected Version: {str(expected_memory_version)}\n"
-                       f"   Found Version: {str(memory_version)}\n"
-                       f"Please follow these steps:\n"
-                       f"   If the game is running, try entering '/memr connect' in the client.\n"
-                       f"   You should see 'The Memory Reader is ready!'\n"
-                       f"   If that did not work, or the game is not running, run the OpenGOAL Launcher.\n"
-                       f"   Click Jak II > Features > Mods > ArchipelaGOAL.\n"
-                       f"   Then click Advanced > Play in Debug Mode.\n"
-                       f"   Try entering '/memr connect' in the client again.")
+                msg = (
+                    f"Could not find a version number in the OpenGOAL memory structure!\n"
+                    f"   Expected Version: {str(expected_memory_version)}\n"
+                    f"   Found Version: {str(memory_version)}\n"
+                    f"Please follow these steps:\n"
+                    f"   If the game is running, try entering '/memr connect' in the client.\n"
+                    f"   You should see 'The Memory Reader is ready!'\n"
+                    f"   If that did not work, or the game is not running, run the OpenGOAL Launcher.\n"
+                    f"   Click Jak II > Features > Mods > ArchipelaGOAL.\n"
+                    f"   Then click Advanced > Play in Debug Mode.\n"
+                    f"   Try entering '/memr connect' in the client again."
+                )
             else:
-                msg = (f"The OpenGOAL memory structure is incompatible with the current Archipelago client!\n"
-                       f"   Expected Version: {str(expected_memory_version)}\n"
-                       f"   Found Version: {str(memory_version)}\n"
-                       f"Please follow these steps:\n"
-                       f"   Run the OpenGOAL Launcher, click Jak II > Features > Mods > ArchipelaGOAL.\n"
-                       f"   Click Update (if one is available).\n"
-                       f"   Click Advanced > Compile. When this is done, click Continue.\n"
-                       f"   Click Versions and verify the latest version is marked 'Active'.\n"
-                       f"   Close all launchers, games, clients, and console windows, then restart Archipelago.")
+                msg = (
+                    f"The OpenGOAL memory structure is incompatible with the current Archipelago client!\n"
+                    f"   Expected Version: {str(expected_memory_version)}\n"
+                    f"   Found Version: {str(memory_version)}\n"
+                    f"Please follow these steps:\n"
+                    f"   Run the OpenGOAL Launcher, click Jak II > Features > Mods > ArchipelaGOAL.\n"
+                    f"   Click Update (if one is available).\n"
+                    f"   Click Advanced > Compile. When this is done, click Continue.\n"
+                    f"   Click Versions and verify the latest version is marked 'Active'.\n"
+                    f"   Close all launchers, games, clients, and console windows, then restart Archipelago."
+                )
             self.log_error(logger, msg)
             self.connected = False
 
     async def print_status(self):
-        proc_id = str(self.gk_process.process_id) if self.gk_process else "None"
+        proc_id = str(self.gk_process.pid) if self.gk_process else "None"
         last_loc = str(self.location_outbox[self.outbox_index - 1] if self.outbox_index else "None")
-        msg = (f"Memory Reader Status:\n"
-               f"   Game process ID: {proc_id}\n"
-               f"   Game state memory address: {str(self.goal_address)}\n"
-               f"   Last location checked: {last_loc}")
+        msg = (
+            f"Memory Reader Status:\n"
+            f"   Game process ID: {proc_id}\n"
+            f"   Game state memory address: {str(self.goal_address)}\n"
+            f"   Last location checked: {last_loc}"
+        )
         await self.verify_memory_version()
         self.log_info(logger, msg)
 
@@ -317,8 +336,7 @@ class Jak2MemoryReader:
             # Read completed main missions
             next_mission_idx = self.read_goal_address(next_mission_index_offset, sizeof_uint64)
             for i in range(int(next_mission_idx)):
-                raw_main_task_id = self.read_goal_address(missions_checked_offset + (i * sizeof_uint32),
-                                                          sizeof_uint32)
+                raw_main_task_id = self.read_goal_address(missions_checked_offset + (i * sizeof_uint32), sizeof_uint32)
 
                 # Verify mission exists in our table
                 if raw_main_task_id in main_tasks_to_missions:
@@ -330,15 +348,18 @@ class Jak2MemoryReader:
                         self.location_outbox.append(main_mission_id)
 
                         mission_name = main_tasks_to_missions[raw_main_task_id].name
-                        logger.debug(f"Mission completed! Raw game-task: {raw_main_task_id}"
-                                     f" -> Mission ID: {main_mission_id}"
-                                     f" -> '{mission_name}'")
+                        logger.debug(
+                            f"Mission completed! Raw game-task: {raw_main_task_id}"
+                            f" -> Mission ID: {main_mission_id}"
+                            f" -> '{mission_name}'"
+                        )
 
             # Read completed side missions
             next_side_mission_idx = self.read_goal_address(next_side_mission_index_offset, sizeof_uint64)
             for i in range(int(next_side_mission_idx)):
-                raw_side_task_id = self.read_goal_address(side_missions_checked_offset + (i * sizeof_uint32),
-                                                          sizeof_uint32)
+                raw_side_task_id = self.read_goal_address(
+                    side_missions_checked_offset + (i * sizeof_uint32), sizeof_uint32
+                )
 
                 # Verify mission exists in our table
                 if raw_side_task_id in side_tasks_to_missions:
@@ -350,51 +371,72 @@ class Jak2MemoryReader:
                         self.location_outbox.append(side_mission_id)
 
                         side_mission_name = side_tasks_to_missions[raw_side_task_id].name
-                        logger.debug(f"Side mission completed! ID: {raw_side_task_id} -> '{side_mission_name}' "
-                                     f"(location: {side_mission_id})")
+                        logger.debug(
+                            f"Side mission completed! ID: {raw_side_task_id} -> '{side_mission_name}' "
+                            f"(location: {side_mission_id})"
+                        )
 
+            next_item_idx = self.read_goal_address(next_item_index_offset, sizeof_uint64)
+            for i in range(int(next_item_idx)):
+                item_id = self.read_goal_address(items_checked_offset + (i * sizeof_uint32), sizeof_uint32)
+                item_location_id = get_item_id_by_feature_id(item_id)
+                logger.info(
+                    f"DEBUG LOOP i={i} item_id={item_id} item_location_id={item_location_id} in_outbox={item_location_id in self.location_outbox if item_location_id else 'N/A'}")
+                if item_location_id is not None and item_location_id not in self.location_outbox:
+                    self.location_outbox.append(item_location_id)
+                    logger.debug(f"Item checked! Raw game-feature ID: {item_id} -> Location ID: {item_location_id}")
             completed = self.read_goal_address(completed_offset, sizeof_uint8)
             if completed > 0 and not self.finished_game:
                 self.finished_game = True
                 self.log_success(logger, "Congratulations! You finished the game!")
 
-            # death_count = self.read_goal_address(death_count_offset, sizeof_uint32)
-            # death_cause = self.read_goal_address(death_cause_offset, sizeof_uint8)
-            #if death_count > self.death_count:
-            #    self.cause_of_death = autopsy(death_cause)
-            #    self.send_deathlink = True
-            #    self.death_count += 1
+            needs_replay = self.read_goal_address(needs_item_replay_offset, sizeof_uint8)
+            if needs_replay > 0:
+                self.needs_item_replay = True
+
+            death_count = self.read_goal_address(death_count_offset, sizeof_uint32)
+            death_cause = self.read_goal_address(death_cause_offset, sizeof_uint8)
+            if death_count > self.death_count:
+                self.cause_of_death = autopsy(death_cause)
+                self.send_deathlink = True
+                self.death_count += 1
 
             # Listen to any changes to this setting!
-            # deathlink_flag = self.read_goal_address(deathlink_enabled_offset, sizeof_uint8)
-            # self.deathlink_enabled = bool(deathlink_flag)
+            deathlink_flag = self.read_goal_address(deathlink_enabled_offset, sizeof_uint8)
+            self.deathlink_enabled = bool(deathlink_flag)
 
-        except (ProcessError, MemoryReadError, WinAPIError):
-            msg = (f"Error reading game memory! (Did the game crash?)\n"
-                   f"Please close all open windows and reopen the Jak II Client "
-                   f"from the Archipelago Launcher.\n"
-                   f"If the game and compiler do not restart automatically, please follow these steps:\n"
-                   f"   Run the OpenGOAL Launcher, click Jak II > Features > Mods > ArchipelaGOAL.\n"
-                   f"   Then click Advanced > Play in Debug Mode.\n"
-                   f"   Then click Advanced > Open REPL.\n"
-                   f"   Then close and reopen the Jak II Client from the Archipelago Launcher.")
+        except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+            msg = (
+                f"Error reading game memory! (Did the game crash?)\n"
+                f"Please close all open windows and reopen the Jak II Client "
+                f"from the Archipelago Launcher.\n"
+                f"If the game and compiler do not restart automatically, please follow these steps:\n"
+                f"   Run the OpenGOAL Launcher, click Jak II > Features > Mods > ArchipelaGOAL.\n"
+                f"   Then click Advanced > Play in Debug Mode.\n"
+                f"   Then click Advanced > Open REPL.\n"
+                f"   Then close and reopen the Jak II Client from the Archipelago Launcher."
+            )
             self.log_error(logger, msg)
             self.connected = False
 
         return self.location_outbox
 
     def read_goal_address(self, offset: int, length: int) -> int:
+        if not (self.gk_process and self.goal_address):
+            raise Exception(memory_version_offset, sizeof_uint32)
         return int.from_bytes(
-            self.gk_process.read_bytes(self.goal_address + offset, length),
+            self.gk_process.read_process_memory(
+                self.goal_address + offset,
+                bytes,
+                length,
+            ),
             byteorder="little",
-            signed=False)
+            signed=False,
+        )
 
     def save_data(self):
         with open("jakii_location_outbox.json", "w+") as f:
-            dump = {
-                "outbox_index": self.outbox_index,
-                "location_outbox": self.location_outbox
-            }
+            dump = {"outbox_index": self.outbox_index, "location_outbox": self.location_outbox}
             json.dump(dump, f, indent=4)
 
     def load_data(self):

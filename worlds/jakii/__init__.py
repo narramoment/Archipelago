@@ -1,4 +1,6 @@
 # Archipelago Imports
+import math
+
 import settings
 from Options import OptionError, OptionGroup
 from worlds.AutoWorld import World, WebWorld
@@ -44,7 +46,6 @@ components.append(Component("Jak II Client",
                             icon="jak2_icon"))
 
 
-# TODO: Add proper icon for Jak 2
 icon_paths["jak2_icon"] = f"ap:{__name__}/icons/jak2_icon.png"
 
 
@@ -119,12 +120,10 @@ class JakIIWorld(World):
             raise OptionError(f"Unknown completion condition selected for Jak II: {self.completion_type}")
 
         # Calculate Filler and Traps, if applicable
-        if self.options.percent_filler_replaced_with_traps > 0:
-            self.total_trap_items = (
-                int((
-                    self.options.percent_filler_replaced_with_traps / 100) * (self.total_items - self.total_prog_items))
-                )
-            self.total_filler_items = self.total_items - self.total_prog_items - self.total_trap_items
+        available_slots = self.total_items - self.total_prog_items
+        trap_replace_percent = self.options.percent_filler_replaced_with_traps / 100
+        self.total_trap_items = math.floor(available_slots * trap_replace_percent)
+        self.total_filler_items = available_slots - self.total_trap_items
 
         self.trap_weights = self.options.trap_weights.weighted_pair
 
@@ -161,16 +160,7 @@ class JakIIWorld(World):
                 self.multiworld.itempool += [
                     Jak2Item(item_name, classification, item_id, self.player)
                     for _ in range(count)]
-                items_made += 1
-
-            # Skip traps
-            if TRAP_ID_START <= item_id <= TRAP_ID_END:
-                continue
-
-        all_regions = self.multiworld.get_regions(self.player)
-        total_locations = sum(reg.location_count for reg in cast(list[JakIIRegion], all_regions))
-        total_filler = total_locations - items_made
-        self.multiworld.itempool += [self.create_filler() for _ in range(total_filler)]
+                items_made += count
 
         # Handle Traps (fr!!)
         # Manually filling the item pool with an assortment of traps. Only done if one or more traps have a weight > 0.
@@ -227,11 +217,20 @@ class JakIIWorld(World):
                 _completion_rule(state=state, player=self.player))
 
     def fill_slot_data(self) -> dict[str, Any]:
+        from .locs.mission_locations import main_mission_table
         options_dict = self.options.as_dict("jak_2_completion_condition",
                                             "specific_mission_for_completion",
                                             "number_of_missions_for_completion",
                                             "percent_filler_replaced_with_traps",
                                             "trap_effect_duration",
                                             "trap_weights",
+                                            "randomize_oracle_cost",
+                                            "oracle_cost_level0",
+                                            "oracle_cost_level1",
+                                            "oracle_cost_level2",
+                                            "oracle_cost_level3",
                                             )
+        # Convert the AP mission_id to GOAL's task_id, since ap-verify-game-completed! compares against task_id.
+        mission_id = options_dict["specific_mission_for_completion"]
+        options_dict["specific_mission_for_completion"] = main_mission_table[mission_id].task_id
         return options_dict
