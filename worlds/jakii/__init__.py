@@ -155,6 +155,11 @@ class JakIIWorld(World):
         for item_name in self.item_name_to_id:
             item_id = self.item_name_to_id[item_name]
 
+            if ITEM_ID_FILLER_START <= item_id <= ITEM_ID_FILLER_END:
+                continue
+            if TRAP_ID_START <= item_id <= TRAP_ID_END:
+                continue
+
             data = self.item_data_helper(item_id)
             for (count, classification, num) in data:
                 self.multiworld.itempool += [
@@ -162,20 +167,31 @@ class JakIIWorld(World):
                     for _ in range(count)]
                 items_made += count
 
-        # Handle Traps (fr!!)
-        # Manually filling the item pool with an assortment of traps. Only done if one or more traps have a weight > 0.
-        names, weights = self.trap_weights
-        if sum(weights):
-            total_traps = self.total_trap_items
-            trap_list = self.random.choices(names, weights=weights, k=total_traps)
-            self.multiworld.itempool += [self.create_item(trap_name) for trap_name in trap_list]
-            items_made += total_traps
-
         # Handle Unfilled Locations!
         all_regions = self.multiworld.get_regions(self.player)
         total_locations = sum(reg.location_count for reg in cast(list[JakIIRegion], all_regions))
         total_filler = total_locations - items_made
-        self.multiworld.itempool += [self.create_filler() for _ in range(total_filler)]
+
+        trap_percent = self.options.percent_filler_replaced_with_traps.value / 100
+        trap_count = int(total_filler * trap_percent)
+        filler_count = total_filler - trap_count
+
+        trap_names, trap_weights = self.options.trap_weights.weighted_pair
+        if all(w==0 for w in trap_weights):
+            trap_count = 0
+            filler_count = total_filler
+
+            print(f"[JakII] total_locations={total_locations}, items_made={items_made}, total_filler={total_filler}")
+            print(f"[JakII] trap_percent={trap_percent}, trap_count={trap_count}, filler_count={filler_count}")
+            print(f"[JakII] trap_weights={list(zip(trap_names, trap_weights))}")
+        self.multiworld.itempool += [self.create_filler() for _ in range(max(0,filler_count))]
+        self.multiworld.itempool += [self.create_trap() for _ in range(max(0,trap_count))]
+
+    def create_trap(self) -> Jak2Item:
+        trap_names, trap_weights = self.options.trap_weights.weighted_pair
+        trap_name = self.random.choices(trap_names, weights=trap_weights, k=1)[0]
+        trap_id = self.item_name_to_id[trap_name]
+        return Jak2Item(trap_name, ItemClass.trap, trap_id, self.player)
 
     def create_item(self, name: str) -> Jak2Item:
         item_id = self.item_name_to_id[name]
