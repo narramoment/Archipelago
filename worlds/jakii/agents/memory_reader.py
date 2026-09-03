@@ -412,6 +412,7 @@ class Jak2MemoryReader:
             # Listen to any changes to this setting!
             deathlink_flag = self.read_goal_address(deathlink_enabled_offset, sizeof_uint8)
             self.deathlink_enabled = bool(deathlink_flag)
+            logger.debug(f"DEBUG: deathlink_flag={deathlink_flag}, self.deathlink_enabled={self.deathlink_enabled}")
 
         except (PyMemoryEditorError, OSError) as e:
             msg = (

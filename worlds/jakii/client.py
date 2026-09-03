@@ -170,7 +170,8 @@ class Jak2Context(CommonContext):
                     slot_data.get("oracle_cost_level0", 25),
                     slot_data.get("oracle_cost_level1", 200),
                     slot_data.get("oracle_cost_level2", 200),
-                    slot_data.get("oracle_cost_level3", 100),))
+                    slot_data.get("oracle_cost_level3", 100),
+                    slot_data.get("death_link", 0),))
 
             # Tell the server if Deathlink is enabled or disabled in-game, allowing us to "remember" the user's choice.
             self.on_deathlink_toggle()
