@@ -403,7 +403,8 @@ class Jak2ReplClient:
                             oracle_cost_level0: int,
                             oracle_cost_level1: int,
                             oracle_cost_level2: int,
-                            oracle_cost_level3: int) -> bool:
+                            oracle_cost_level3: int,
+                            deathlink: int = 0) -> bool:
         sanitized_name = self.sanitize_file_text(slot_name)
         sanitized_seed = self.sanitize_file_text(slot_seed)
 
@@ -418,7 +419,8 @@ class Jak2ReplClient:
                                   f":oracle-cost-level0 {oracle_cost_level0} "
                                   f":oracle-cost-level1 {oracle_cost_level1} "
                                   f":oracle-cost-level2 {oracle_cost_level2} "
-                                  f":oracle-cost-level3 {oracle_cost_level3}))")
+                                  f":oracle-cost-level3 {oracle_cost_level3} "
+                                  f":deathlink {deathlink}))")
         message = (f"Setting options: \n"
                    f"   Slot Name {sanitized_name}, \n"
                    f"   Slot Seed {sanitized_seed}, \n"
@@ -430,7 +432,8 @@ class Jak2ReplClient:
                    f"   Oracle Cost Level0 {oracle_cost_level0}, \n"
                    f"   Oracle Cost Level1 {oracle_cost_level1}, \n"
                    f"   Oracle Cost Level2 {oracle_cost_level2}, \n"
-                   f"   Oracle Cost Level3 {oracle_cost_level3}... ")
+                   f"   Oracle Cost Level3 {oracle_cost_level3}, \n"
+                   f"   Deathlink {deathlink}... ")
         if ok:
             logger.debug(message + "Success!")
         else:
