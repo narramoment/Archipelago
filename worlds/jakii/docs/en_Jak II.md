@@ -141,6 +141,21 @@ Open the pause menu and navigate it to `Game Options`. Then, open it and `Archip
 you can then select `Go to...` and then pick your destination, based on what locations you have unlocked. Additional
 note, if you don't have the correct items to go to a specific place, you cannot warp there until you get them.
 
+## What items do I need to utilize the warp menu?
+
+| Location Name                        | Items Required                                             |
+|--------------------------------------|------------------------------------------------------------|
+| Underground Hideout                  | N/A                                                        |
+| Hip-Hog Saloon                       | Red Security Pass or BOTH Green and Yellow Security Passes |
+| The Power Station                    | Items required for the Slums to Port Route                 |
+| Onin's Tent                          | Items required for the Slums to Market Route               |
+| The Stadium                          | Items required for the Slums to Stadium Route              |
+| The entrance of Baron Praxis' Palace | Items required for the Slums to Market Route               |
+| The Landing Pad                      | Items required for the Slums to Landing Route              |
+
+NOTE: Documentation for each route can be found on the logic spreadsheet in the Jak II Discord thread, or you can just
+use Pop Tracker to track each route individually.
+
 ## I think I found a bug, where should I report it?
 
 Depending on the nature of the bug, there are a few options:
