@@ -3,7 +3,14 @@ import struct
 import sys
 from typing import ByteString, Callable
 import json
-from PyMemoryEditor import OpenProcess, ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess
+
+from .. import get_orb_locations
+
+try:
+    from PyMemoryEditor import OpenProcess, PyMemoryEditorError
+except ImportError:
+    from PyMemoryEditor import OpenProcess, ProcessNotFoundError
+    PyMemoryEditorError = ProcessNotFoundError
 from dataclasses import dataclass
 
 from pymem.exception import WinAPIError
@@ -11,7 +18,9 @@ from pymem.exception import WinAPIError
 import Utils
 from worlds.jakii.locs.mission_locations import (main_tasks_to_missions,
                                                  side_tasks_to_missions,
-                                                 get_item_id_by_feature_id)
+                                                 get_item_id_by_feature_id,
+                                                 medal_ids_to_medals,
+                                                 get_orb_location_id)
 from ..game_id import jak2_gk
 
 logger = logging.getLogger("Jak2MemoryReader")
@@ -27,7 +36,7 @@ sizeof_float = 4
 # *****************************************************************************
 # **** This number must match (-> *ap-info-jak2* version) in ap-struct.gc! ****
 # *****************************************************************************
-expected_memory_version = 5
+expected_memory_version = 6
 
 
 # IMPORTANT: OpenGOAL memory structures are particular about the alignment, in memory, of member elements according to
@@ -88,11 +97,16 @@ deathlink_enabled_offset = offsets.define(sizeof_uint8)
 # Trap Information
 trap_duration_offset = offsets.define(sizeof_float)
 
-# Item Replay Information
-needs_item_replay_offset = offsets.define(sizeof_uint8)
-initial_replay_done_offset = offsets.define(sizeof_uint8)
+# Minigame medal information
+next_medal_index_offset = offsets.define(sizeof_uint64)
+medals_checked_offset = offsets.define(sizeof_uint32, 50)
 
-# End marker (uint8 array of 4 bytes - "end\0")
+# Orb Information
+orbs_found_offset = offsets.define(sizeof_uint32)
+next_orb_index_offset = offsets.define(sizeof_uint64)
+orbs_checked_offset = offsets.define(sizeof_uint32, 286)
+
+# End marker
 end_marker_offset = offsets.define(sizeof_uint8, 4)
 
 
@@ -154,7 +168,8 @@ class Jak2MemoryReader:
     location_outbox: list[int] = []
     outbox_index: int = 0
     finished_game: bool = False
-    needs_item_replay: bool = False
+
+    slot_seed: str = ""
 
     # Deathlink handling
     deathlink_enabled: bool = False
@@ -203,8 +218,8 @@ class Jak2MemoryReader:
 
         if self.connected:
             try:
-                OpenProcess(process_name=jak2_gk)
-            except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+                OpenProcess(name=jak2_gk)
+            except PyMemoryEditorError as e:
                 msg = (
                     f"Error reading game memory! (Did the game crash?)\n"
                     f"Please close all open windows and reopen the Jak II Client "
@@ -216,6 +231,7 @@ class Jak2MemoryReader:
                     f"   Then close and reopen the Jak II Client from the Archipelago Launcher."
                 )
                 self.log_error(logger, msg)
+                logger.error(e)
                 self.connected = False
         else:
             return
@@ -246,13 +262,14 @@ class Jak2MemoryReader:
 
     async def connect(self):
         try:
-            self.gk_process = OpenProcess(process_name=jak2_gk)
+            self.gk_process = OpenProcess(name=jak2_gk)
             if self.gk_process:
                 logger.debug("Found the gk process: " + str(self.gk_process.pid) if self.gk_process else None)
             else:
                 return
-        except ProcessNotFoundError:
+        except PyMemoryEditorError as e:
             self.log_error(logger, "Could not find the game process.")
+            logger.error(e)
             self.connected = False
             return
 
@@ -290,7 +307,7 @@ class Jak2MemoryReader:
                 self.connected = True
             else:
                 raise Exception(memory_version_offset, sizeof_uint32)
-        except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+        except Exception as e:
             if memory_version is None:
                 msg = (
                     f"Could not find a version number in the OpenGOAL memory structure!\n"
@@ -317,6 +334,7 @@ class Jak2MemoryReader:
                     f"   Close all launchers, games, clients, and console windows, then restart Archipelago."
                 )
             self.log_error(logger, msg)
+            logger.error(e)
             self.connected = False
 
     async def print_status(self):
@@ -380,19 +398,39 @@ class Jak2MemoryReader:
             for i in range(int(next_item_idx)):
                 item_id = self.read_goal_address(items_checked_offset + (i * sizeof_uint32), sizeof_uint32)
                 item_location_id = get_item_id_by_feature_id(item_id)
-                logger.info(
-                    f"DEBUG LOOP i={i} item_id={item_id} item_location_id={item_location_id} in_outbox={item_location_id in self.location_outbox if item_location_id else 'N/A'}")
                 if item_location_id is not None and item_location_id not in self.location_outbox:
                     self.location_outbox.append(item_location_id)
                     logger.debug(f"Item checked! Raw game-feature ID: {item_id} -> Location ID: {item_location_id}")
+
+            # Read completed minigame medals
+            next_medal_idx = self.read_goal_address(next_medal_index_offset, sizeof_uint64)
+            for i in range(int(next_medal_idx)):
+                raw_medal_id = self.read_goal_address(medals_checked_offset + (i * sizeof_uint32), sizeof_uint32)
+
+                if raw_medal_id in medal_ids_to_medals:
+                    medal = medal_ids_to_medals[raw_medal_id]
+                    loc_id = medal.location_id
+                    if loc_id not in self.location_outbox:
+                        self.location_outbox.append(loc_id)
+                        logger.debug(
+                            f"Medal earned! Medal ID: {raw_medal_id}"
+                            f" -> Location ID: {loc_id}"
+                            f" -> '{medal.name}'"
+                        )
+
             completed = self.read_goal_address(completed_offset, sizeof_uint8)
             if completed > 0 and not self.finished_game:
                 self.finished_game = True
                 self.log_success(logger, "Congratulations! You finished the game!")
 
-            needs_replay = self.read_goal_address(needs_item_replay_offset, sizeof_uint8)
-            if needs_replay > 0:
-                self.needs_item_replay = True
+            next_orb_idx = self.read_goal_address(next_orb_index_offset, sizeof_uint64)
+            for i in range(int(next_orb_idx)):
+                raw_orb_id = self.read_goal_address(orbs_checked_offset + (i * sizeof_uint32), sizeof_uint32)
+
+                loc_id = get_orb_location_id(raw_orb_id)
+                if loc_id not in self.location_outbox:
+                    self.location_outbox.append(loc_id)
+                    logger.debug(f"Orb checked! Orb ID: {raw_orb_id} -> Location ID: {loc_id}")
 
             death_count = self.read_goal_address(death_count_offset, sizeof_uint32)
             death_cause = self.read_goal_address(death_cause_offset, sizeof_uint8)
@@ -405,7 +443,7 @@ class Jak2MemoryReader:
             deathlink_flag = self.read_goal_address(deathlink_enabled_offset, sizeof_uint8)
             self.deathlink_enabled = bool(deathlink_flag)
 
-        except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+        except (PyMemoryEditorError, OSError) as e:
             msg = (
                 f"Error reading game memory! (Did the game crash?)\n"
                 f"Please close all open windows and reopen the Jak II Client "
@@ -417,6 +455,7 @@ class Jak2MemoryReader:
                 f"   Then close and reopen the Jak II Client from the Archipelago Launcher."
             )
             self.log_error(logger, msg)
+            logger.error(e)
             self.connected = False
 
         return self.location_outbox
@@ -435,13 +474,17 @@ class Jak2MemoryReader:
         )
 
     def save_data(self):
-        with open("jakii_location_outbox.json", "w+") as f:
+        filename = f"jakii_location_outbox_{self.slot_seed}.json" if self.slot_seed else "jakii_location_outbox.json"
+        with open(filename, "w+") as f:
             dump = {"outbox_index": self.outbox_index, "location_outbox": self.location_outbox}
             json.dump(dump, f, indent=4)
 
     def load_data(self):
+        self.outbox_index = 0
+        self.location_outbox = []
+        filename = f"jakii_location_outbox_{self.slot_seed}.json" if self.slot_seed else "jakii_location_outbox.json"
         try:
-            with open("jakii_location_outbox.json", "r") as f:
+            with open(filename, "r") as f:
                 load = json.load(f)
                 self.outbox_index = load["outbox_index"]
                 self.location_outbox = load["location_outbox"]

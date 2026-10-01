@@ -35,6 +35,17 @@ class Jak2SideMissionData:
             self.rule = lambda state, player: True
 
 
+class Jak2MedalData:
+    medal_id: int
+    location_id: int
+    name: str
+
+    def __init__(self, medal_id: int, location_id: int, name: str):
+        self.medal_id = medal_id
+        self.location_id = location_id
+        self.name = name
+
+
 # Names for Missions are taken directly from the game
 main_mission_table = {
     # Act 1
@@ -374,11 +385,13 @@ side_mission_table = {
                              slums_to_market(state, player)
                              and state.has("Yellow Security Pass", player)),
     # Extra Race Missions
-    125: Jak2SideMissionData(mission_id=125, task_id=25, name="Beat Erol in Race Challenge (Side Mission, Near Hip Hog)",
+    125: Jak2SideMissionData(mission_id=125, task_id=101,
+                             name="Beat Erol in Race Challenge (Side Mission, Near Hip Hog)",
                              rule=lambda state, player:
                              slums_to_port(state, player)
                              and state.has("Yellow Security Pass", player)),
-    126: Jak2SideMissionData(mission_id=126, task_id=26, name="Port Race Side Mission (Near Port/Industrial Connection)",
+    126: Jak2SideMissionData(mission_id=126, task_id=102,
+                             name="Port Race Side Mission (Near Port/Industrial Connection)",
                              rule=lambda state, player:
                              slums_to_port(state, player)),
     # Stadium Challenges
@@ -587,3 +600,66 @@ def get_item_id_by_feature_id(game_feature_id: int) -> int | None:
     if loc_id in item_check_table:
         return loc_id
     return None
+
+
+# Minigame bronze/silver/gold medal locations. Only included when the
+# Minigame Medal Checks option is enabled.
+# Location IDs are offset by 20000 to avoid colliding with missions (1-133) and item checks (10000+).
+MEDAL_LOCATION_OFFSET = 20000
+
+minigame_medal_table = {
+    1: Jak2MedalData(medal_id=1, location_id=MEDAL_LOCATION_OFFSET + 1, name="Scatter Gun Course - Bronze Medal"),
+    2: Jak2MedalData(medal_id=2, location_id=MEDAL_LOCATION_OFFSET + 2, name="Scatter Gun Course - Silver Medal"),
+    3: Jak2MedalData(medal_id=3, location_id=MEDAL_LOCATION_OFFSET + 3, name="Scatter Gun Course - Gold Medal"),
+    4: Jak2MedalData(medal_id=4, location_id=MEDAL_LOCATION_OFFSET + 4, name="Blaster Gun Course - Bronze Medal"),
+    5: Jak2MedalData(medal_id=5, location_id=MEDAL_LOCATION_OFFSET + 5, name="Blaster Gun Course - Silver Medal"),
+    6: Jak2MedalData(medal_id=6, location_id=MEDAL_LOCATION_OFFSET + 6, name="Blaster Gun Course - Gold Medal"),
+    7: Jak2MedalData(medal_id=7, location_id=MEDAL_LOCATION_OFFSET + 7, name="Vulcan Fury Gun Course - Bronze Medal"),
+    8: Jak2MedalData(medal_id=8, location_id=MEDAL_LOCATION_OFFSET + 8, name="Vulcan Fury Gun Course - Silver Medal"),
+    9: Jak2MedalData(medal_id=9, location_id=MEDAL_LOCATION_OFFSET + 9, name="Vulcan Fury Gun Course - Gold Medal"),
+    10: Jak2MedalData(medal_id=10, location_id=MEDAL_LOCATION_OFFSET + 10, name="Peacemaker Gun Course - Bronze Medal"),
+    11: Jak2MedalData(medal_id=11, location_id=MEDAL_LOCATION_OFFSET + 11, name="Peacemaker Gun Course - Silver Medal"),
+    12: Jak2MedalData(medal_id=12, location_id=MEDAL_LOCATION_OFFSET + 12, name="Peacemaker Gun Course - Gold Medal"),
+    13: Jak2MedalData(medal_id=13, location_id=MEDAL_LOCATION_OFFSET + 13, name="Onin's Game - Medal"),
+    14: Jak2MedalData(medal_id=14, location_id=MEDAL_LOCATION_OFFSET + 14, name="JET-Board Challenge - Bronze Medal"),
+    15: Jak2MedalData(medal_id=15, location_id=MEDAL_LOCATION_OFFSET + 15, name="JET-Board Challenge - Silver Medal"),
+    16: Jak2MedalData(medal_id=16, location_id=MEDAL_LOCATION_OFFSET + 16, name="JET-Board Challenge - Gold Medal"),
+    17: Jak2MedalData(medal_id=17, location_id=MEDAL_LOCATION_OFFSET + 17, name="Class 3 Race - Bronze Medal"),
+    18: Jak2MedalData(medal_id=18, location_id=MEDAL_LOCATION_OFFSET + 18, name="Class 3 Race - Silver Medal"),
+    19: Jak2MedalData(medal_id=19, location_id=MEDAL_LOCATION_OFFSET + 19, name="Class 3 Race - Gold Medal"),
+    20: Jak2MedalData(medal_id=20, location_id=MEDAL_LOCATION_OFFSET + 20, name="Class 2 Race - Bronze Medal"),
+    21: Jak2MedalData(medal_id=21, location_id=MEDAL_LOCATION_OFFSET + 21, name="Class 2 Race - Silver Medal"),
+    22: Jak2MedalData(medal_id=22, location_id=MEDAL_LOCATION_OFFSET + 22, name="Class 2 Race - Gold Medal"),
+    23: Jak2MedalData(medal_id=23, location_id=MEDAL_LOCATION_OFFSET + 23, name="Class 1 Race - Bronze Medal"),
+    24: Jak2MedalData(medal_id=24, location_id=MEDAL_LOCATION_OFFSET + 24, name="Class 1 Race - Silver Medal"),
+    25: Jak2MedalData(medal_id=25, location_id=MEDAL_LOCATION_OFFSET + 25, name="Class 1 Race - Gold Medal"),
+    26: Jak2MedalData(medal_id=26, location_id=MEDAL_LOCATION_OFFSET + 26, name="Reverse Class 3 Race - Bronze Medal"),
+    27: Jak2MedalData(medal_id=27, location_id=MEDAL_LOCATION_OFFSET + 27, name="Reverse Class 3 Race - Silver Medal"),
+    28: Jak2MedalData(medal_id=28, location_id=MEDAL_LOCATION_OFFSET + 28, name="Reverse Class 3 Race - Gold Medal"),
+    29: Jak2MedalData(medal_id=29, location_id=MEDAL_LOCATION_OFFSET + 29, name="Reverse Class 2 Race - Bronze Medal"),
+    30: Jak2MedalData(medal_id=30, location_id=MEDAL_LOCATION_OFFSET + 30, name="Reverse Class 2 Race - Silver Medal"),
+    31: Jak2MedalData(medal_id=31, location_id=MEDAL_LOCATION_OFFSET + 31, name="Reverse Class 2 Race - Gold Medal"),
+    32: Jak2MedalData(medal_id=32, location_id=MEDAL_LOCATION_OFFSET + 32, name="Reverse Class 1 Race - Bronze Medal"),
+    33: Jak2MedalData(medal_id=33, location_id=MEDAL_LOCATION_OFFSET + 33, name="Reverse Class 1 Race - Silver Medal"),
+    34: Jak2MedalData(medal_id=34, location_id=MEDAL_LOCATION_OFFSET + 34, name="Reverse Class 1 Race - Gold Medal"),
+    35: Jak2MedalData(medal_id=35, location_id=MEDAL_LOCATION_OFFSET + 35, name="City Port Race Side Mission - Bronze Medal"),
+    36: Jak2MedalData(medal_id=36, location_id=MEDAL_LOCATION_OFFSET + 36, name="City Port Race Side Mission - Silver Medal"),
+    37: Jak2MedalData(medal_id=37, location_id=MEDAL_LOCATION_OFFSET + 37, name="City Port Race Side Mission - Gold Medal"),
+    38: Jak2MedalData(medal_id=38, location_id=MEDAL_LOCATION_OFFSET + 38, name="Erol Race - Bronze Medal"),
+    39: Jak2MedalData(medal_id=39, location_id=MEDAL_LOCATION_OFFSET + 39, name="Erol Race - Silver Medal"),
+    40: Jak2MedalData(medal_id=40, location_id=MEDAL_LOCATION_OFFSET + 40, name="Erol Race - Gold Medal"),
+}
+
+medal_ids_to_medals = {medal_id: medal for medal_id, medal in minigame_medal_table.items()}
+
+
+def get_minigame_medal_locations(medal_checks_enabled: bool) -> dict[str, int]:
+    if not medal_checks_enabled:
+        return {}
+    return {medal.name: medal.location_id for medal in minigame_medal_table.values()}
+
+def get_orb_location_id(orb_id: int) -> int:
+    return 50200 + orb_id
+
+def get_orb_locations(max_orbs: int) -> dict[str, int]:
+    return {f"Orb #{i}": get_orb_location_id(i) for i in range(1, max_orbs + 1)}

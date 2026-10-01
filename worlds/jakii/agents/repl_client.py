@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from queue import Queue
 from typing import Callable
 
-from PyMemoryEditor import OpenProcess, ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess
+from PyMemoryEditor import OpenProcess, PyMemoryEditorError
 
 import asyncio
 from asyncio import StreamReader, StreamWriter, Lock
@@ -66,7 +66,8 @@ class Jak2ReplClient:
     item_inbox: dict[int, NetworkItem] = {}
     inbox_index = 0
     json_message_queue: Queue[JsonMessageData] = queue.Queue()
-    is_replaying: bool = False
+
+    slot_seed: str = ""
 
     # Logging callbacks
     # These will write to the provided logger, as well as the Client GUI with color markup.
@@ -113,8 +114,8 @@ class Jak2ReplClient:
 
         if self.connected:
             try:
-                OpenProcess(process_name=jak2_gk)
-            except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+                OpenProcess(name=jak2_gk)
+            except PyMemoryEditorError as e:
                 msg = (
                     f"Error reading game memory! (Did the game crash?)\n"
                     f"Please close all open windows and reopen the Jak II Client "
@@ -126,11 +127,12 @@ class Jak2ReplClient:
                     f"   Then close and reopen the Jak II Client from the Archipelago Launcher."
                 )
                 self.log_error(logger, msg)
+                logger.error(e)
                 self.connected = False
             try:
                 # Ping to see if it's alive.
-                OpenProcess(process_name=jak2_goalc)
-            except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+                OpenProcess(name=jak2_goalc)
+            except PyMemoryEditorError as e:
                 msg = (
                     f"Error sending data to compiler! (Did the compiler crash?)\n"
                     f"Please close all open windows and reopen the Jak II Client "
@@ -142,6 +144,7 @@ class Jak2ReplClient:
                     f"   Then close and reopen the Jak II Client from the Archipelago Launcher."
                 )
                 self.log_error(logger, msg)
+                logger.error(e)
                 self.connected = False
         else:
             return
@@ -155,21 +158,11 @@ class Jak2ReplClient:
                 self.processed_initial_items = True
                 await self.send_connection_status("ready")
 
-        if self.memr.needs_item_replay:
-            self.inbox_index = 0
-            self.is_replaying = True
-            self.memr.needs_item_replay = False
-            await self.send_form_no_response("(set! (-> *ap-info-jak2* needs-item-replay) (the-as uint8 0))")
-
         # Receive Items from AP. Handle 1 item per tick.
         if len(self.item_inbox) > self.inbox_index:
             await self.receive_item()
             await self.save_data()
             self.inbox_index += 1
-
-
-        if self.is_replaying and self.inbox_index >= len(self.item_inbox):
-            self.is_replaying = False
 
         if self.received_deathlink:
             await self.receive_deathlink()
@@ -214,17 +207,19 @@ class Jak2ReplClient:
 
     async def connect(self):
         try:
-            self.gk_process = OpenProcess(process_name=jak2_gk)
+            self.gk_process = OpenProcess(name=jak2_gk)
             logger.debug("Found the gk process: " + str(self.gk_process.pid))
-        except ProcessNotFoundError:
+        except PyMemoryEditorError as e:
             self.log_error(logger, "Could not find the game process.")
+            logger.error(e)
             return
 
         try:
-            self.goalc_process = OpenProcess(process_name=jak2_goalc)
+            self.goalc_process = OpenProcess(name=jak2_goalc)
             logger.debug("Found the goalc process: " + str(self.goalc_process.pid))
-        except ProcessNotFoundError:
+        except PyMemoryEditorError as e:
             self.log_error(logger, "Could not find the compiler process.")
+            logger.error(e)
             return
 
         try:
@@ -308,6 +303,7 @@ class Jak2ReplClient:
         body = ""
         if data.my_item_name and data.my_item_finder:
             is_trap = "Trap" in data.my_item_name
+            is_filler = any(f in data.my_item_name for f in ("Pill", "Ammo", "Health Pack"))
             if is_trap and data.my_item_finder != "MYSELF":
                 direction = "'trap"
             elif data.my_item_finder == "MYSELF":
@@ -317,8 +313,10 @@ class Jak2ReplClient:
             body += (f" (let ((m (the ap-messenger (process-by-name \"ap-messenger\" *active-pool*)))) "
                      f" (when m (append-messages m {direction} "
                      f" {self.sanitize_game_text(data.my_item_name)} "
-                     f" {self.sanitize_game_text(data.my_item_finder)})))")
+                     f" {self.sanitize_game_text(data.my_item_finder)}"
+                     f" {'#t' if is_filler else '#f'})))")
         if data.their_item_name and data.their_item_owner:
+            is_filler_theirs = any(f in data.their_item_name for f in ("Pill", "Ammo", "Health Pack"))
             if data.their_item_owner == "MYSELF":
                 direction = "'found"
             else:
@@ -326,7 +324,8 @@ class Jak2ReplClient:
             body += (f" (let ((m (the ap-messenger (process-by-name \"ap-messenger\" *active-pool*)))) "
                      f" (when m (append-messages m {direction} "
                      f" {self.sanitize_game_text(data.their_item_name)} "
-                     f" {self.sanitize_game_text(data.their_item_owner)})))")
+                     f" {self.sanitize_game_text(data.their_item_owner)}"
+                     f" {'#t' if is_filler_theirs else '#f'})))")
         await self.send_form_no_response(f"(begin {body} (none))")
 
     async def receive_item(self):
@@ -341,9 +340,6 @@ class Jak2ReplClient:
         item_name: str = item_data.name
         item_symbol: str = item_data.symbol
 
-        if self.is_replaying and (TRAP_ID_START <= item <= TRAP_ID_END or
-                                  ITEM_ID_FILLER_START <= item <= ITEM_ID_FILLER_END):
-            return True
 
         # Trap handling
         if TRAP_ID_START <= item <= TRAP_ID_END:
@@ -404,7 +400,9 @@ class Jak2ReplClient:
                             oracle_cost_level1: int,
                             oracle_cost_level2: int,
                             oracle_cost_level3: int,
-                            deathlink: int = 0) -> bool:
+                            minigame_medal_checks: int = 0,
+                            orbsanity: int = 0,
+                            orbs: int = 1) -> bool:
         sanitized_name = self.sanitize_file_text(slot_name)
         sanitized_seed = self.sanitize_file_text(slot_seed)
 
@@ -420,7 +418,9 @@ class Jak2ReplClient:
                                   f":oracle-cost-level1 {oracle_cost_level1} "
                                   f":oracle-cost-level2 {oracle_cost_level2} "
                                   f":oracle-cost-level3 {oracle_cost_level3} "
-                                  f":deathlink {deathlink}))")
+                                  f":minigame-medal-checks {minigame_medal_checks} "
+                                  f":orbsanity {orbsanity} "
+                                  f":orbs {orbs} )) ")
         message = (f"Setting options: \n"
                    f"   Slot Name {sanitized_name}, \n"
                    f"   Slot Seed {sanitized_seed}, \n"
@@ -433,7 +433,9 @@ class Jak2ReplClient:
                    f"   Oracle Cost Level1 {oracle_cost_level1}, \n"
                    f"   Oracle Cost Level2 {oracle_cost_level2}, \n"
                    f"   Oracle Cost Level3 {oracle_cost_level3}, \n"
-                   f"   Deathlink {deathlink}... ")
+                   f"   Minigame Medal Checks {minigame_medal_checks}, \n"
+                   f"   Orbsanity {orbsanity}, \n"
+                   f"   Orbs {orbs}... ")
         if ok:
             logger.debug(message + "Success!")
         else:
@@ -449,7 +451,8 @@ class Jak2ReplClient:
         return ok
 
     async def save_data(self):
-        with open("jakii_item_inbox.json", "w+") as f:
+        filename = f"jakii_item_inbox_{self.slot_seed}.json" if self.slot_seed else "jakii_item_inbox.json"
+        with open(filename, "w+") as f:
             dump = {
                 "inbox_index": self.inbox_index,
                 "item_inbox": [
@@ -465,8 +468,11 @@ class Jak2ReplClient:
             json.dump(dump, f, indent=4)
 
     def load_data(self):
+        self.inbox_index = 0
+        self.item_inbox = {}
+        filename = f"jakii_item_inbox_{self.slot_seed}.json" if self.slot_seed else "jakii_item_inbox.json"
         try:
-            with open("jakii_item_inbox.json", "r") as f:
+            with open(filename, "r") as f:
                 load = json.load(f)
                 self.inbox_index = load["inbox_index"]
                 self.item_inbox = {

@@ -1,5 +1,7 @@
 from BaseClasses import Item
 from .game_id import jak2_name, jak2_max
+from ..jakanddaxter import orb_item_table
+
 
 class Jak2Item(Item):
     game: str = jak2_name
@@ -24,6 +26,15 @@ ITEM_ID_FILLER_START = 34       # Filler items start at ID 34 (Dark Eco Pill)
 ITEM_ID_FILLER_END = 39         # Standard filler items end at ID 39
 TRAP_ID_START = 40              # Trap items start at ID 40 (Trip Trap)
 TRAP_ID_END = 56                # Trap items end at ID 55
+ORBSANITY_ID = 57               # Orbs.
+
+orb_item_table = {
+    1: "1 Precursor Orb"
+}
+
+orb_to_id = {
+    size: ORBSANITY_ID + i for i, size in enumerate(orb_item_table.keys())
+}
 
 # Unified Item Table - Single source of truth for all items
 # Every item is organized by classification using ID ranges defined above
@@ -104,5 +115,11 @@ item_table = {
     53: Jak2ItemData(item_id=53, name="Ammo Trap", symbol="russian-roulette"),
     54: Jak2ItemData(item_id=54, name="Dark Trap", symbol="anger-issues"),
     55: Jak2ItemData(item_id=55, name="Hero Trap", symbol="hardcore"),
-    56: Jak2ItemData(item_id=56, name="Reverse Trap", symbol="turn-right-to-go-left")
+    56: Jak2ItemData(item_id=56, name="Reverse Trap", symbol="turn-right-to-go-left"),
+
+    # Orbs (ID 57)
+    **{
+        orb_to_id[size]: Jak2ItemData(item_id=orb_to_id[size], name=name, symbol="orb")
+        for size, name in orb_item_table.items()
+    }
 }

@@ -31,6 +31,8 @@ class TestJak2Client(unittest.TestCase):
         # Mock callbacks
         location_callback = MagicMock()
         finish_callback = MagicMock()
+        send_deathlink_callback = MagicMock()
+        toggle_deathlink_callback = MagicMock()
         error_callback = MagicMock()
         warn_callback = MagicMock()
         success_callback = MagicMock()
@@ -39,6 +41,8 @@ class TestJak2Client(unittest.TestCase):
         reader = Jak2MemoryReader(
             location_callback,
             finish_callback,
+            send_deathlink_callback,
+            toggle_deathlink_callback,
             error_callback,
             warn_callback,
             success_callback,
@@ -57,12 +61,14 @@ class TestJak2Client(unittest.TestCase):
         warn_callback = MagicMock()
         success_callback = MagicMock()
         info_callback = MagicMock()
+        memr = MagicMock()
         
         repl = Jak2ReplClient(
             error_callback,
             warn_callback,
             success_callback,
-            info_callback
+            info_callback,
+            memr
         )
         
         self.assertFalse(repl.connected)

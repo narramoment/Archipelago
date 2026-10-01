@@ -29,6 +29,20 @@ class NumberOfMissionsForCompletion(Range):
     range_end = 92
     default = 65
 
+class MinigameMedalChecks(Toggle):
+    """If enabled, adds bronze/silver/gold medal locations for minigames and races as checks."""
+    display_name = "Minigame Medal Checks"
+
+class Orbsanity(Toggle):
+    """If enabled, Precursor Orbs are randomized. Orbs are collected as standalone checks, and picking up an orb
+    sends an Archiplago Check instead of gathering orbs directly. Orb items received from Archipelago grants an orb!"""
+    display_name = "Orbsanity"
+
+class Orbs(Choice):
+    """Sets how many orbs make up a check. Only used if Orbsanity is enabled."""
+    display_name = "Orbs"
+    option_1_orb = 1
+    default = 1
 
 class PercentOfFillerItemsReplacedWithTraps(Range):
     """
@@ -115,6 +129,9 @@ class JakIIOptions(PerGameCommonOptions):
     jak_2_completion_condition: CompletionCondition
     specific_mission_for_completion: SpecificMissionForCompletion
     number_of_missions_for_completion: NumberOfMissionsForCompletion
+    minigame_medal_checks: MinigameMedalChecks
+    orbsanity: Orbsanity
+    orbs: Orbs
     percent_filler_replaced_with_traps: PercentOfFillerItemsReplacedWithTraps
     trap_effect_duration: TrapEffectDuration
     trap_weights: TrapWeights

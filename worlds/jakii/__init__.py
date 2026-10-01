@@ -12,11 +12,14 @@ from typing import cast, ClassVar, Any
 from . import options
 from .game_id import jak2_name, jak2_max
 from .items import (item_table, ITEM_ID_KEY_START, ITEM_ID_KEY_END, ITEM_ID_FILLER_START, ITEM_ID_FILLER_END,
-                    TRAP_ID_START, TRAP_ID_END, Jak2ItemData, Jak2Item)
+                    TRAP_ID_START, TRAP_ID_END, ORBSANITY_ID, Jak2ItemData, Jak2Item, orb_item_table,
+                    orb_to_id)
 from .locs import (mission_locations)
 from .locations import (JakIILocation, all_locations_table)
-from .locs.mission_locations import Jak2MissionData
+from .locs.mission_locations import Jak2MissionData, get_minigame_medal_locations, get_orb_locations
 from .regs.region_base import JakIIRegion
+
+TOTAL_ORBS = 286
 
 
 class Jak2Settings(settings.Group):
@@ -93,7 +96,8 @@ class JakIIWorld(World):
     settings: ClassVar[Jak2Settings]
 
     item_name_to_id = {item_data.name: k for k, item_data in item_table.items()}
-    location_name_to_id = {data.name: k for k, data in all_locations_table.items()}
+    location_name_to_id = {**{data.name: k for k, data in all_locations_table.items()},
+                           **get_minigame_medal_locations(True), **get_orb_locations(TOTAL_ORBS)}
     item_name_groups = {
         "Items": {item.name for item in item_table.values()}
     }
@@ -108,6 +112,8 @@ class JakIIWorld(World):
     total_filler_items: int = 0
     total_trap_items: int = 0
     trap_weights: tuple[list[str], list[int]]
+    orb_item_table: str = ""
+    orb_item_id: int = 0
 
     def generate_early(self) -> None:
         # Cache completion conditions and values.
@@ -118,6 +124,10 @@ class JakIIWorld(World):
             self.completion_value = self.options.number_of_missions_for_completion.value
         else:
             raise OptionError(f"Unknown completion condition selected for Jak II: {self.completion_type}")
+
+        if self.options.orbsanity:
+            self.orb_item_name = orb_item_table[1]
+            self.orb_item_id = orb_to_id[1]
 
         # Calculate Filler and Traps, if applicable
         available_slots = self.total_items - self.total_prog_items
@@ -142,6 +152,9 @@ class JakIIWorld(World):
         elif TRAP_ID_START <= item <= TRAP_ID_END:
             # Trap Items (their own table) (will also be made manually)
             data.append((0, ItemClass.trap, 0))
+        elif item in orb_to_id.values():
+            # Orbs, count is determined dynamically in create_items(), not here
+            data.append((1, ItemClass.useful, 0))
         else:
             # If we try to make items with ID's outside defined ranges, something has gone wrong
             raise KeyError(f"Tried to fill item pool with unknown ID {item}. Valid ranges: "
@@ -159,6 +172,8 @@ class JakIIWorld(World):
                 continue
             if TRAP_ID_START <= item_id <= TRAP_ID_END:
                 continue
+            if item_id in orb_to_id.values():
+                continue
 
             data = self.item_data_helper(item_id)
             for (count, classification, num) in data:
@@ -166,6 +181,13 @@ class JakIIWorld(World):
                     Jak2Item(item_name, classification, item_id, self.player)
                     for _ in range(count)]
                 items_made += count
+
+        if self.options.orbsanity:
+            self.multiworld.itempool += [
+                Jak2Item(self.orb_item_name, ItemClass.useful, self.orb_item_id, self.player)
+                for _ in range(TOTAL_ORBS)
+            ]
+            items_made += TOTAL_ORBS
 
         # Handle Unfilled Locations!
         all_regions = self.multiworld.get_regions(self.player)
@@ -212,6 +234,72 @@ class JakIIWorld(World):
             mission = all_locations_table[mission_id]
             mission_tree_region.add_jak_mission(mission_id, mission.name, mission.rule)
 
+        # Minigame bronze/silver/gold medal locations — only added when the option is enabled.
+        if self.options.minigame_medal_checks:
+            scatter_gun_mission = all_locations_table[7]
+            blaster_gun_mission = all_locations_table[18]
+            onin_mission = all_locations_table[39]
+            jetboard_mission = all_locations_table[16]
+            class3_mission = all_locations_table[35]
+            class2_mission = all_locations_table[46]
+            class1_mission = all_locations_table[54]
+            reverse_class3_mission = all_locations_table[131]
+            reverse_class2_mission = all_locations_table[132]
+            reverse_class1_mission = all_locations_table[133]
+            city_port_race_mission = all_locations_table[126]
+            erol_race_mission = all_locations_table[125]
+
+            medal_rules = {
+                "Scatter Gun Course - Bronze Medal": scatter_gun_mission.rule,
+                "Scatter Gun Course - Silver Medal": scatter_gun_mission.rule,
+                "Scatter Gun Course - Gold Medal": scatter_gun_mission.rule,
+                "Blaster Gun Course - Bronze Medal": blaster_gun_mission.rule,
+                "Blaster Gun Course - Silver Medal": blaster_gun_mission.rule,
+                "Blaster Gun Course - Gold Medal": blaster_gun_mission.rule,
+                "Vulcan Fury Gun Course - Bronze Medal": lambda state, player: state.has("Vulcan Fury", player),
+                "Vulcan Fury Gun Course - Silver Medal": lambda state, player: state.has("Vulcan Fury", player),
+                "Vulcan Fury Gun Course - Gold Medal": lambda state, player: state.has("Vulcan Fury", player),
+                "Peacemaker Gun Course - Bronze Medal": lambda state, player: state.has("Peacemaker", player),
+                "Peacemaker Gun Course - Silver Medal": lambda state, player: state.has("Peacemaker", player),
+                "Peacemaker Gun Course - Gold Medal": lambda state, player: state.has("Peacemaker", player),
+                "Onin's Game - Medal": onin_mission.rule,
+                "JET-Board Challenge - Bronze Medal": jetboard_mission.rule,
+                "JET-Board Challenge - Silver Medal": jetboard_mission.rule,
+                "JET-Board Challenge - Gold Medal": jetboard_mission.rule,
+                "Class 3 Race - Bronze Medal": class3_mission.rule,
+                "Class 3 Race - Silver Medal": class3_mission.rule,
+                "Class 3 Race - Gold Medal": class3_mission.rule,
+                "Class 2 Race - Bronze Medal": class2_mission.rule,
+                "Class 2 Race - Silver Medal": class2_mission.rule,
+                "Class 2 Race - Gold Medal": class2_mission.rule,
+                "Class 1 Race - Bronze Medal": class1_mission.rule,
+                "Class 1 Race - Silver Medal": class1_mission.rule,
+                "Class 1 Race - Gold Medal": class1_mission.rule,
+                "Reverse Class 3 Race - Bronze Medal": reverse_class3_mission.rule,
+                "Reverse Class 3 Race - Silver Medal": reverse_class3_mission.rule,
+                "Reverse Class 3 Race - Gold Medal": reverse_class3_mission.rule,
+                "Reverse Class 2 Race - Bronze Medal": reverse_class2_mission.rule,
+                "Reverse Class 2 Race - Silver Medal": reverse_class2_mission.rule,
+                "Reverse Class 2 Race - Gold Medal": reverse_class2_mission.rule,
+                "Reverse Class 1 Race - Bronze Medal": reverse_class1_mission.rule,
+                "Reverse Class 1 Race - Silver Medal": reverse_class1_mission.rule,
+                "Reverse Class 1 Race - Gold Medal": reverse_class1_mission.rule,
+                "City Port Race Side Mission - Bronze Medal": city_port_race_mission.rule,
+                "City Port Race Side Mission - Silver Medal": city_port_race_mission.rule,
+                "City Port Race Side Mission - Gold Medal": city_port_race_mission.rule,
+                "Erol Race - Bronze Medal": erol_race_mission.rule,
+                "Erol Race - Silver Medal": erol_race_mission.rule,
+                "Erol Race - Gold Medal": erol_race_mission.rule,
+            }
+
+            for name, loc_id in get_minigame_medal_locations(True).items():
+                rule = medal_rules.get(name, lambda state, player: True)
+                mission_tree_region.add_jak_mission(loc_id, name, rule)
+
+        if self.options.orbsanity:
+            for name, loc_id in get_orb_locations(TOTAL_ORBS).items():
+                mission_tree_region.add_jak_mission(loc_id, name, lambda state, player: True)
+
         self.multiworld.regions.append(mission_tree_region)
 
         # Handle completion condition.
@@ -245,6 +333,9 @@ class JakIIWorld(World):
                                             "oracle_cost_level1",
                                             "oracle_cost_level2",
                                             "oracle_cost_level3",
+                                            "minigame_medal_checks",
+                                            "orbsanity",
+                                            "orbs",
                                             )
         # Convert the AP mission_id to GOAL's task_id, since ap-verify-game-completed! compares against task_id.
         mission_id = options_dict["specific_mission_for_completion"]
