@@ -126,9 +126,8 @@ class JakIIWorld(World):
             raise OptionError(f"Unknown completion condition selected for Jak II: {self.completion_type}")
 
         if self.options.orbsanity:
-            bundle_size = self.options.orbs.value
-            self.orb_item_name = orb_item_table[bundle_size]
-            self.orb_item_id = orb_to_id[bundle_size]
+            self.orb_item_name = orb_item_table[1]
+            self.orb_item_id = orb_to_id[1]
 
         # Calculate Filler and Traps, if applicable
         available_slots = self.total_items - self.total_prog_items
@@ -184,13 +183,11 @@ class JakIIWorld(World):
                 items_made += count
 
         if self.options.orbsanity:
-            bundle_size = self.options.orbs.value
-            num_bundles = TOTAL_ORBS // bundle_size
             self.multiworld.itempool += [
                 Jak2Item(self.orb_item_name, ItemClass.useful, self.orb_item_id, self.player)
-                for _ in range(num_bundles)
+                for _ in range(TOTAL_ORBS)
             ]
-            items_made += num_bundles
+            items_made += TOTAL_ORBS
 
         # Handle Unfilled Locations!
         all_regions = self.multiworld.get_regions(self.player)
@@ -300,9 +297,7 @@ class JakIIWorld(World):
                 mission_tree_region.add_jak_mission(loc_id, name, rule)
 
         if self.options.orbsanity:
-            bundle_size = self.options.orbs.value
-            num_bundles = TOTAL_ORBS // bundle_size
-            for name, loc_id in get_orb_locations(num_bundles).items():
+            for name, loc_id in get_orb_locations(TOTAL_ORBS).items():
                 mission_tree_region.add_jak_mission(loc_id, name, lambda state, player: True)
 
         self.multiworld.regions.append(mission_tree_region)

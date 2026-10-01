@@ -97,16 +97,16 @@ deathlink_enabled_offset = offsets.define(sizeof_uint8)
 # Trap Information
 trap_duration_offset = offsets.define(sizeof_float)
 
-# Minigame medal information (uint in GOAL = uint64 in C++)
+# Minigame medal information
 next_medal_index_offset = offsets.define(sizeof_uint64)
-medals_checked_offset = offsets.define(sizeof_uint32, 40)
+medals_checked_offset = offsets.define(sizeof_uint32, 50)
 
 # Orb Information
 orbs_found_offset = offsets.define(sizeof_uint32)
 next_orb_index_offset = offsets.define(sizeof_uint64)
 orbs_checked_offset = offsets.define(sizeof_uint32, 286)
 
-# End marker (uint8 array of 4 bytes - "end\0")
+# End marker
 end_marker_offset = offsets.define(sizeof_uint8, 4)
 
 
@@ -168,6 +168,8 @@ class Jak2MemoryReader:
     location_outbox: list[int] = []
     outbox_index: int = 0
     finished_game: bool = False
+
+    slot_seed: str = ""
 
     # Deathlink handling
     deathlink_enabled: bool = False
@@ -396,8 +398,6 @@ class Jak2MemoryReader:
             for i in range(int(next_item_idx)):
                 item_id = self.read_goal_address(items_checked_offset + (i * sizeof_uint32), sizeof_uint32)
                 item_location_id = get_item_id_by_feature_id(item_id)
-                logger.info(
-                    f"DEBUG LOOP i={i} item_id={item_id} item_location_id={item_location_id} in_outbox={item_location_id in self.location_outbox if item_location_id else 'N/A'}")
                 if item_location_id is not None and item_location_id not in self.location_outbox:
                     self.location_outbox.append(item_location_id)
                     logger.debug(f"Item checked! Raw game-feature ID: {item_id} -> Location ID: {item_location_id}")
@@ -474,13 +474,17 @@ class Jak2MemoryReader:
         )
 
     def save_data(self):
-        with open("jakii_location_outbox.json", "w+") as f:
+        filename = f"jakii_location_outbox_{self.slot_seed}.json" if self.slot_seed else "jakii_location_outbox.json"
+        with open(filename, "w+") as f:
             dump = {"outbox_index": self.outbox_index, "location_outbox": self.location_outbox}
             json.dump(dump, f, indent=4)
 
     def load_data(self):
+        self.outbox_index = 0
+        self.location_outbox = []
+        filename = f"jakii_location_outbox_{self.slot_seed}.json" if self.slot_seed else "jakii_location_outbox.json"
         try:
-            with open("jakii_location_outbox.json", "r") as f:
+            with open(filename, "r") as f:
                 load = json.load(f)
                 self.outbox_index = load["outbox_index"]
                 self.location_outbox = load["location_outbox"]

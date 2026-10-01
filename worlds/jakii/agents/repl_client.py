@@ -67,6 +67,8 @@ class Jak2ReplClient:
     inbox_index = 0
     json_message_queue: Queue[JsonMessageData] = queue.Queue()
 
+    slot_seed: str = ""
+
     # Logging callbacks
     # These will write to the provided logger, as well as the Client GUI with color markup.
     log_error: Callable  # Red
@@ -449,7 +451,8 @@ class Jak2ReplClient:
         return ok
 
     async def save_data(self):
-        with open("jakii_item_inbox.json", "w+") as f:
+        filename = f"jakii_item_inbox_{self.slot_seed}.json" if self.slot_seed else "jakii_item_inbox.json"
+        with open(filename, "w+") as f:
             dump = {
                 "inbox_index": self.inbox_index,
                 "item_inbox": [
@@ -465,8 +468,11 @@ class Jak2ReplClient:
             json.dump(dump, f, indent=4)
 
     def load_data(self):
+        self.inbox_index = 0
+        self.item_inbox = {}
+        filename = f"jakii_item_inbox_{self.slot_seed}.json" if self.slot_seed else "jakii_item_inbox.json"
         try:
-            with open("jakii_item_inbox.json", "r") as f:
+            with open(filename, "r") as f:
                 load = json.load(f)
                 self.inbox_index = load["inbox_index"]
                 self.item_inbox = {

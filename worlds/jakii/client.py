@@ -117,8 +117,6 @@ class Jak2Context(CommonContext):
                                    self.on_log_success,
                                    self.on_log_info,
                                    self.memr)
-        # self.repl.load_data()
-        # self.memr.load_data()
         super().__init__(server_address, password)
 
     def run_gui(self):
@@ -142,6 +140,10 @@ class Jak2Context(CommonContext):
 
         if cmd == "RoomInfo":
             self.slot_seed = args["seed_name"]
+            self.memr.slot_seed = self.slot_seed[:8]
+            self.repl.slot_seed = self.slot_seed[:8]
+            self.memr.load_data()
+            self.repl.load_data()
 
         if cmd == "Connected":
             slot_data = args["slot_data"]
