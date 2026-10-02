@@ -16,7 +16,7 @@ from .items import (item_table, ITEM_ID_KEY_START, ITEM_ID_KEY_END, ITEM_ID_FILL
                     orb_to_id)
 from .locs import (mission_locations)
 from .locations import (JakIILocation, all_locations_table)
-from .locs.mission_locations import Jak2MissionData, get_minigame_medal_locations, get_orb_locations
+from .locs.mission_locations import Jak2MissionData, get_minigame_medal_locations, get_orb_locations, orb_names_table
 from .regs.region_base import JakIIRegion
 
 TOTAL_ORBS = 286
@@ -97,7 +97,7 @@ class JakIIWorld(World):
 
     item_name_to_id = {item_data.name: k for k, item_data in item_table.items()}
     location_name_to_id = {**{data.name: k for k, data in all_locations_table.items()},
-                           **get_minigame_medal_locations(True), **get_orb_locations(TOTAL_ORBS)}
+                           **get_minigame_medal_locations(True), **get_orb_locations(True)}
     item_name_groups = {
         "Items": {item.name for item in item_table.values()}
     }
@@ -113,6 +113,7 @@ class JakIIWorld(World):
     total_trap_items: int = 0
     trap_weights: tuple[list[str], list[int]]
     orb_item_table: str = ""
+    orb_item_name: str = ""
     orb_item_id: int = 0
 
     def generate_early(self) -> None:
@@ -297,8 +298,9 @@ class JakIIWorld(World):
                 mission_tree_region.add_jak_mission(loc_id, name, rule)
 
         if self.options.orbsanity:
-            for name, loc_id in get_orb_locations(TOTAL_ORBS).items():
-                mission_tree_region.add_jak_mission(loc_id, name, lambda state, player: True)
+            for name, loc_id in get_orb_locations(True).items():
+                rule = orb_names_table.get(name, lambda state, player: True)
+                mission_tree_region.add_jak_mission(loc_id, name, rule)
 
         self.multiworld.regions.append(mission_tree_region)
 
