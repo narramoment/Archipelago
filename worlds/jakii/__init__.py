@@ -18,6 +18,8 @@ from .locs import (mission_locations)
 from .locations import (JakIILocation, all_locations_table)
 from .locs.mission_locations import Jak2MissionData, get_minigame_medal_locations, get_orb_locations, orb_names_table
 from .regs.region_base import JakIIRegion
+from worlds.jakii.rules import (slums_to_port, slums_to_stadium, slums_to_market, slums_to_landing, slums_to_nest,
+                                any_gun)
 
 TOTAL_ORBS = 286
 
@@ -257,12 +259,18 @@ class JakIIWorld(World):
                 "Blaster Gun Course - Bronze Medal": blaster_gun_mission.rule,
                 "Blaster Gun Course - Silver Medal": blaster_gun_mission.rule,
                 "Blaster Gun Course - Gold Medal": blaster_gun_mission.rule,
-                "Vulcan Fury Gun Course - Bronze Medal": lambda state, player: state.has("Vulcan Fury", player),
-                "Vulcan Fury Gun Course - Silver Medal": lambda state, player: state.has("Vulcan Fury", player),
-                "Vulcan Fury Gun Course - Gold Medal": lambda state, player: state.has("Vulcan Fury", player),
-                "Peacemaker Gun Course - Bronze Medal": lambda state, player: state.has("Peacemaker", player),
-                "Peacemaker Gun Course - Silver Medal": lambda state, player: state.has("Peacemaker", player),
-                "Peacemaker Gun Course - Gold Medal": lambda state, player: state.has("Peacemaker", player),
+                "Vulcan Fury Gun Course - Bronze Medal": lambda state, player: state.has("Vulcan Fury", player)
+                                                                               and slums_to_port(state, player),
+                "Vulcan Fury Gun Course - Silver Medal": lambda state, player: state.has("Vulcan Fury", player)
+                                                                               and slums_to_port(state, player),
+                "Vulcan Fury Gun Course - Gold Medal": lambda state, player: state.has("Vulcan Fury", player)
+                                                                             and slums_to_port(state, player),
+                "Peacemaker Gun Course - Bronze Medal": lambda state, player: state.has("Peacemaker", player)
+                                                                              and slums_to_port(state, player),
+                "Peacemaker Gun Course - Silver Medal": lambda state, player: state.has("Peacemaker", player)
+                                                                              and slums_to_port(state, player),
+                "Peacemaker Gun Course - Gold Medal": lambda state, player: state.has("Peacemaker", player)
+                                                                            and slums_to_port(state, player),
                 "Onin's Game - Medal": onin_mission.rule,
                 "JET-Board Challenge - Bronze Medal": jetboard_mission.rule,
                 "JET-Board Challenge - Silver Medal": jetboard_mission.rule,
