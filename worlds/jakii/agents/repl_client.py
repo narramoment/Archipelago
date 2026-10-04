@@ -470,19 +470,3 @@ class Jak2ReplClient:
     def load_data(self):
         self.inbox_index = 0
         self.item_inbox = {}
-        filename = f"jakii_item_inbox_{self.slot_seed}.json" if self.slot_seed else "jakii_item_inbox.json"
-        try:
-            with open(filename, "r") as f:
-                load = json.load(f)
-                self.inbox_index = load["inbox_index"]
-                self.item_inbox = {
-                    k: NetworkItem(
-                        item=load["item_inbox"][k]["item"],
-                        location=load["item_inbox"][k]["location"],
-                        player=load["item_inbox"][k]["player"],
-                        flags=load["item_inbox"][k]["flags"],
-                    )
-                    for k in range(0, len(load["item_inbox"]))
-                }
-        except FileNotFoundError:
-            pass
