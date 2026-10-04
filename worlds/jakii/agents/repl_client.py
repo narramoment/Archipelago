@@ -98,20 +98,6 @@ class Jak2ReplClient:
             await self.connect()
             self.initiated_connect = False
 
-        # Handle compile wait without blocking the event loop
-        if self.waiting_for_compile:
-            if asyncio.get_event_loop().time() >= self.compile_ready_time:
-                self.waiting_for_compile = False
-                self.log_info(logger, "[4/5] Set cheat mode to off...")
-                await asyncio.sleep(0.5)
-                await self.send_form_no_response("(set! *cheat-mode* #f)")
-                await asyncio.sleep(0.5)
-                self.log_info(logger, "[5/5] Run the title screen...")
-                await self.send_form_no_response("(start 'play (get-continue-by-name *game-info* \"title-start\"))")
-                self.log_success(logger, "The REPL is ready!")
-                self.connected = True
-            return
-
         if self.connected:
             try:
                 OpenProcess(name=jak2_gk)
@@ -175,15 +161,6 @@ class Jak2ReplClient:
             json_txt_data = self.json_message_queue.get_nowait()
             await self.write_game_text(json_txt_data)
 
-    ## this fucking sucks, but it works. this replaces the send_form function
-    async def send_form_no_response(self, form: str) -> bool:
-        """Send a form that doesn't return a response through the socket."""
-        header = struct.pack("<II", len(form), 10)
-        async with self.lock:
-            self.writer.write(header + form.encode())
-            await self.writer.drain()
-        return True
-
     async def send_form(self, form: str, print_ok: bool = True) -> bool:
         header = struct.pack("<II", len(form), 10)
         async with self.lock:
@@ -191,7 +168,7 @@ class Jak2ReplClient:
             await self.writer.drain()
 
             try:
-                response_data = await self.reader.read(1024)
+                response_data = await asyncio.wait_for(self.reader.read(1024), timeout=120.0)
                 response = response_data.decode()
             except asyncio.TimeoutError:
                 self.log_error(logger, f"Timed out while waiting for REPL response to {form}")
@@ -242,19 +219,25 @@ class Jak2ReplClient:
         if self.reader and self.writer:
             self.log_info(logger, "[1/5] Listen on the game's port...")
             await asyncio.sleep(0.5)
-            await self.send_form_no_response("(lt)")
+            await self.send_form("(lt)", print_ok=False)
             await asyncio.sleep(3)
 
             self.log_info(logger, "[2/5] Set debug flag to on...")
             await asyncio.sleep(0.5)
-            await self.send_form_no_response("(set! *debug-segment* #t)")
+            await self.send_form("(set! *debug-segment* #t)", print_ok=False)
 
             self.log_info(logger, "[3/5] Compile the game...")
             await asyncio.sleep(0.5)
-            await self.send_form_no_response("(mi)")
-            self.log_info(logger, "Waiting for compilation to finish")
-            self.waiting_for_compile = True
-            self.compile_ready_time = asyncio.get_event_loop().time() + 30
+            await self.send_form("(mi)", print_ok=False)
+
+            self.log_info(logger, "[4/5] Set cheat mode to off...")
+            await asyncio.sleep(0.5)
+            await self.send_form("(set! *cheat-mode* #f)", print_ok=False)
+            await asyncio.sleep(0.5)
+            self.log_info(logger, "[5/5] Run the title screen...")
+            await self.send_form("(start 'play (get-continue-by-name *game-info* \"title-start\"))")
+            self.log_success(logger, "The REPL is ready!")
+            self.connected = True
 
     async def print_status(self):
         gc_proc_id = str(self.goalc_process.pid) if self.goalc_process else "None"
@@ -326,7 +309,7 @@ class Jak2ReplClient:
                      f" {self.sanitize_game_text(data.their_item_name)} "
                      f" {self.sanitize_game_text(data.their_item_owner)}"
                      f" {'#t' if is_filler_theirs else '#f'})))")
-        await self.send_form_no_response(f"(begin {body} (none))")
+        await self.send_form(f"(begin {body} (none))", print_ok=False)
 
     async def receive_item(self):
         item = getattr(self.item_inbox[self.inbox_index], "item")
@@ -343,7 +326,7 @@ class Jak2ReplClient:
 
         # Trap handling
         if TRAP_ID_START <= item <= TRAP_ID_END:
-            ok = await self.send_form_no_response(f"(ap-trap-received! '{item_symbol})")
+            ok = await self.send_form(f"(ap-trap-received! '{item_symbol})", print_ok=False)
             if ok:
                 logger.debug(f"Received {item_name}!")
             else:
@@ -351,7 +334,7 @@ class Jak2ReplClient:
             return ok
 
         # Normal item handling
-        ok = await self.send_form_no_response(f"(ap-item-received! '{item_symbol})")
+        ok = await self.send_form(f"(ap-item-received! '{item_symbol})", print_ok=False)
         if ok:
             logger.debug(f"Received {item_name}!")
         else:
@@ -378,7 +361,7 @@ class Jak2ReplClient:
                       "'big-explosion"]
         chosen_death = random.choice(death_types)
 
-        ok = await self.send_form_no_response(f"(ap-deathlink-received! {chosen_death})")
+        ok = await self.send_form(f"(ap-deathlink-received! {chosen_death})", print_ok=False)
         if ok:
             logger.debug(f"Received deathlink signal!")
         else:
@@ -406,7 +389,7 @@ class Jak2ReplClient:
         sanitized_name = self.sanitize_file_text(slot_name)
         sanitized_seed = self.sanitize_file_text(slot_seed)
 
-        ok = await self.send_form_no_response(f"(ap-setup-options! (new 'static 'ap-seed-options "
+        ok = await self.send_form(f"(ap-setup-options! (new 'static 'ap-seed-options "
                                   f":slot-name {sanitized_name} "
                                   f":slot-seed {sanitized_seed} "
                                   f":trap-duration {trap_time}.0 "
@@ -420,7 +403,7 @@ class Jak2ReplClient:
                                   f":oracle-cost-level3 {oracle_cost_level3} "
                                   f":minigame-medal-checks {minigame_medal_checks} "
                                   f":orbsanity {orbsanity} "
-                                  f":orbs {orbs} )) ")
+                                  f":orbs {orbs} )) ", print_ok=False)
         message = (f"Setting options: \n"
                    f"   Slot Name {sanitized_name}, \n"
                    f"   Slot Seed {sanitized_seed}, \n"
@@ -443,7 +426,7 @@ class Jak2ReplClient:
         return ok
 
     async def send_connection_status(self, status: str) -> bool:
-        ok = await self.send_form_no_response(f"(ap-set-connection-status! (ap-connection-status {status}))")
+        ok = await self.send_form(f"(ap-set-connection-status! (ap-connection-status {status}))", print_ok=False)
         if ok:
             logger.debug(f"Connection Status {status} set!")
         else:
