@@ -306,9 +306,12 @@ class JakIIWorld(World):
                 mission_tree_region.add_jak_mission(loc_id, name, rule)
 
         if self.options.orbsanity:
-            for name, loc_id in get_orb_locations(True).items():
-                rule = orb_names_table.get(name, lambda state, player: True)
-                mission_tree_region.add_jak_mission(loc_id, name, rule)
+            for orb in orb_names_table.values():
+                mission_tree_region.add_jak_mission(
+                    orb.location_id,
+                    orb.name,
+                    orb.rule
+                )
 
         self.multiworld.regions.append(mission_tree_region)
 
