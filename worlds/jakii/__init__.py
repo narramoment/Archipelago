@@ -16,8 +16,10 @@ from .items import (item_table, ITEM_ID_KEY_START, ITEM_ID_KEY_END, ITEM_ID_FILL
                     orb_to_id)
 from .locs import (mission_locations)
 from .locations import (JakIILocation, all_locations_table)
-from .locs.mission_locations import Jak2MissionData, get_minigame_medal_locations, get_orb_locations
+from .locs.mission_locations import Jak2MissionData, get_minigame_medal_locations, get_orb_locations, orb_names_table
 from .regs.region_base import JakIIRegion
+from worlds.jakii.rules import (slums_to_port, slums_to_stadium, slums_to_market, slums_to_landing, slums_to_nest,
+                                any_gun)
 
 TOTAL_ORBS = 286
 
@@ -97,7 +99,7 @@ class JakIIWorld(World):
 
     item_name_to_id = {item_data.name: k for k, item_data in item_table.items()}
     location_name_to_id = {**{data.name: k for k, data in all_locations_table.items()},
-                           **get_minigame_medal_locations(True), **get_orb_locations(TOTAL_ORBS)}
+                           **get_minigame_medal_locations(True), **get_orb_locations(True)}
     item_name_groups = {
         "Items": {item.name for item in item_table.values()}
     }
@@ -113,6 +115,7 @@ class JakIIWorld(World):
     total_trap_items: int = 0
     trap_weights: tuple[list[str], list[int]]
     orb_item_table: str = ""
+    orb_item_name: str = ""
     orb_item_id: int = 0
 
     def generate_early(self) -> None:
@@ -256,12 +259,18 @@ class JakIIWorld(World):
                 "Blaster Gun Course - Bronze Medal": blaster_gun_mission.rule,
                 "Blaster Gun Course - Silver Medal": blaster_gun_mission.rule,
                 "Blaster Gun Course - Gold Medal": blaster_gun_mission.rule,
-                "Vulcan Fury Gun Course - Bronze Medal": lambda state, player: state.has("Vulcan Fury", player),
-                "Vulcan Fury Gun Course - Silver Medal": lambda state, player: state.has("Vulcan Fury", player),
-                "Vulcan Fury Gun Course - Gold Medal": lambda state, player: state.has("Vulcan Fury", player),
-                "Peacemaker Gun Course - Bronze Medal": lambda state, player: state.has("Peacemaker", player),
-                "Peacemaker Gun Course - Silver Medal": lambda state, player: state.has("Peacemaker", player),
-                "Peacemaker Gun Course - Gold Medal": lambda state, player: state.has("Peacemaker", player),
+                "Vulcan Fury Gun Course - Bronze Medal": lambda state, player: state.has("Vulcan Fury", player)
+                                                                               and slums_to_port(state, player),
+                "Vulcan Fury Gun Course - Silver Medal": lambda state, player: state.has("Vulcan Fury", player)
+                                                                               and slums_to_port(state, player),
+                "Vulcan Fury Gun Course - Gold Medal": lambda state, player: state.has("Vulcan Fury", player)
+                                                                             and slums_to_port(state, player),
+                "Peacemaker Gun Course - Bronze Medal": lambda state, player: state.has("Peacemaker", player)
+                                                                              and slums_to_port(state, player),
+                "Peacemaker Gun Course - Silver Medal": lambda state, player: state.has("Peacemaker", player)
+                                                                              and slums_to_port(state, player),
+                "Peacemaker Gun Course - Gold Medal": lambda state, player: state.has("Peacemaker", player)
+                                                                            and slums_to_port(state, player),
                 "Onin's Game - Medal": onin_mission.rule,
                 "JET-Board Challenge - Bronze Medal": jetboard_mission.rule,
                 "JET-Board Challenge - Silver Medal": jetboard_mission.rule,
@@ -297,8 +306,12 @@ class JakIIWorld(World):
                 mission_tree_region.add_jak_mission(loc_id, name, rule)
 
         if self.options.orbsanity:
-            for name, loc_id in get_orb_locations(TOTAL_ORBS).items():
-                mission_tree_region.add_jak_mission(loc_id, name, lambda state, player: True)
+            for orb in orb_names_table.values():
+                mission_tree_region.add_jak_mission(
+                    orb.location_id,
+                    orb.name,
+                    orb.rule
+                )
 
         self.multiworld.regions.append(mission_tree_region)
 

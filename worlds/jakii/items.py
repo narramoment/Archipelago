@@ -104,7 +104,7 @@ item_table = {
     44: Jak2ItemData(item_id=44, name="Darkness Trap", symbol="daredevil"),
     45: Jak2ItemData(item_id=45, name="Earthquake Trap", symbol="caseoh"),
     46: Jak2ItemData(item_id=46, name="Teleport Trap", symbol="instant-transmission"),
-    47: Jak2ItemData(item_id=46, name="Despair Trap", symbol="emotional-damage"),
+    47: Jak2ItemData(item_id=47, name="Despair Trap", symbol="emotional-damage"),
     48: Jak2ItemData(item_id=48, name="Pacifism Trap", symbol="personal-bubble"),
     49: Jak2ItemData(item_id=49, name="Health Trap", symbol="hit-by-bus"),
     50: Jak2ItemData(item_id=50, name="Ledge Trap", symbol="rivals-of-aether"),

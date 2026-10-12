@@ -20,7 +20,7 @@ from worlds.jakii.locs.mission_locations import (main_tasks_to_missions,
                                                  side_tasks_to_missions,
                                                  get_item_id_by_feature_id,
                                                  medal_ids_to_medals,
-                                                 get_orb_location_id)
+                                                 orb_ids_to_orbs)
 from ..game_id import jak2_gk
 
 logger = logging.getLogger("Jak2MemoryReader")
@@ -427,10 +427,12 @@ class Jak2MemoryReader:
             for i in range(int(next_orb_idx)):
                 raw_orb_id = self.read_goal_address(orbs_checked_offset + (i * sizeof_uint32), sizeof_uint32)
 
-                loc_id = get_orb_location_id(raw_orb_id)
-                if loc_id not in self.location_outbox:
-                    self.location_outbox.append(loc_id)
-                    logger.debug(f"Orb checked! Orb ID: {raw_orb_id} -> Location ID: {loc_id}")
+                if raw_orb_id in orb_ids_to_orbs:
+                    orb = orb_ids_to_orbs[raw_orb_id]
+                    loc_id = orb.location_id
+                    if loc_id not in self.location_outbox:
+                        self.location_outbox.append(loc_id)
+                        logger.debug(f"Orb checked! Orb ID: {raw_orb_id} -> Location ID: {loc_id}")
 
             death_count = self.read_goal_address(death_count_offset, sizeof_uint32)
             death_cause = self.read_goal_address(death_cause_offset, sizeof_uint8)
