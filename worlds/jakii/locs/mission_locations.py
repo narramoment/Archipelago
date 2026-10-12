@@ -208,7 +208,9 @@ main_mission_table = {
                         rule=lambda state, player:
                         slums_to_market(state, player)
                         and state.has("JET-Board", player)
-                        and state.has_all(("Seal Piece #1", "Seal Piece #2", "Seal Piece #3"), player)),
+                        and state.has_all(("Water Slums Seal Piece",
+                                           "Dig Site Seal Piece",
+                                           "Onin's Seal Piece"), player)),
     41: Jak2MissionData(mission_id=41, task_id=49, name="Mar's Tomb: Pass the first Test of Manhood",
                         rule=lambda state, player:
                         slums_to_market(state, player)
@@ -516,17 +518,17 @@ item_check_table = {
                                                      main_mission_table[25].rule(state, player)),
     ITEM_CHECK_LOCATION_OFFSET + 40: Jak2MissionData(mission_id=ITEM_CHECK_LOCATION_OFFSET + 40,
                                                      task_id=0,
-                                                     name="Seal Piece 1",
+                                                     name="Water Slums Seal Piece",
                                                      rule=lambda state, player:
                                                      main_mission_table[36].rule(state, player)),
     ITEM_CHECK_LOCATION_OFFSET + 41: Jak2MissionData(mission_id=ITEM_CHECK_LOCATION_OFFSET + 41,
                                                      task_id=0,
-                                                     name="Seal Piece 2",
+                                                     name="Dig Site Seal Piece",
                                                      rule=lambda state, player:
                                                      main_mission_table[37].rule(state, player)),
     ITEM_CHECK_LOCATION_OFFSET + 42: Jak2MissionData(mission_id=ITEM_CHECK_LOCATION_OFFSET + 42,
                                                      task_id=0,
-                                                     name="Seal Piece 3",
+                                                     name="Onin's Seal Piece",
                                                      rule=lambda state, player:
                                                      main_mission_table[39].rule(state, player)),
     ITEM_CHECK_LOCATION_OFFSET + 33: Jak2MissionData(mission_id=ITEM_CHECK_LOCATION_OFFSET + 33,

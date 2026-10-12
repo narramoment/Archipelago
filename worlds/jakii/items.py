@@ -81,9 +81,9 @@ item_table = {
     27: Jak2ItemData(item_id=27, name="Life Seed", symbol="life-seed"),
     28: Jak2ItemData(item_id=28, name="Titan Suit", symbol="titan-suit"),
     29: Jak2ItemData(item_id=29, name="Gunpod", symbol="gun-turret"),
-    30: Jak2ItemData(item_id=30, name="Seal Piece #1", symbol="seal-piece-1"),
-    31: Jak2ItemData(item_id=31, name="Seal Piece #2", symbol="seal-piece-2"),
-    32: Jak2ItemData(item_id=32, name="Seal Piece #3", symbol="seal-piece-3"),
+    30: Jak2ItemData(item_id=30, name="Water Slums Seal Piece", symbol="seal-piece-1"),
+    31: Jak2ItemData(item_id=31, name="Dig Site Seal Piece", symbol="seal-piece-2"),
+    32: Jak2ItemData(item_id=32, name="Onin's Seal Piece", symbol="seal-piece-3"),
     33: Jak2ItemData(item_id=33, name="Rift Rider", symbol="rift-rider"),
     
     # ========== FILLER ITEMS ==========
