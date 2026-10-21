@@ -24,7 +24,7 @@ from PyMemoryEditor import OpenProcess, ProcessNotFoundError, AmbiguousProcessNa
 import ModuleUpdate
 import Utils
 
-from CommonClient import ClientCommandProcessor, CommonContext, server_loop, gui_enabled
+from CommonClient import server_loop, gui_enabled
 from NetUtils import ClientStatus
 
 # Jak imports
@@ -35,6 +35,20 @@ from . import JakIIWorld
 from .items import item_table, ITEM_ID_FILLER_START, ITEM_ID_FILLER_END, TRAP_ID_START, TRAP_ID_END
 from .locs.mission_locations import main_mission_table
 from .options import CompletionCondition
+
+# Load Universal Tracker
+tracker_loaded: bool = False
+try:
+    from worlds.tracker.TrackerClient import (
+        TrackerCommandProcessor as ClientCommandProcessor,
+        TrackerGameContext as CommonContext,
+        UT_VERSION
+    )
+
+    tracker_loaded = True
+except ImportError:
+    from CommonClient import ClientCommandProcessor, CommonContext
+    UT_VERSION = 0
 
 ModuleUpdate.update()
 logger = logging.getLogger("Jak2Client")
@@ -119,14 +133,23 @@ class Jak2Context(CommonContext):
                                    self.memr)
         super().__init__(server_address, password)
 
+    def run_generator(self):
+        if tracker_loaded:
+            super().run_generator()
+
+    def make_gui(self):
+        ui = super().make_gui()
+        ui.base_title = "Jak II ArchipelaGOAL Client"
+        if tracker_loaded:
+            ui.base_title += f" | Universal Tracker {UT_VERSION}"
+
+        # AP version is added behind this automatically
+        ui.base_title += " | Archipelago"
+        return ui
+
     def run_gui(self):
-        from kvui import GameManager
-
-        class Jak2Manager(GameManager):
-            logging_pairs = [("Client", "Archipelago")]
-            base_title = "Jak II ArchipelaGOAL Client"
-
-        self.ui = Jak2Manager(self)
+        ui_class = self.make_gui()
+        self.ui = ui_class(self)
         self.ui_task = asyncio.create_task(self.ui.async_run(), name="UI")
 
     async def server_auth(self, password_requested: bool = False):
@@ -137,6 +160,7 @@ class Jak2Context(CommonContext):
         await self.send_connect()
 
     def on_package(self, cmd: str, args: dict):
+        super().on_package(cmd, args)
 
         if cmd == "RoomInfo":
             self.slot_seed = args["seed_name"]
@@ -635,6 +659,12 @@ async def main():
     Utils.init_logging("Jak2Client", exception_logger="Client")
 
     ctx = Jak2Context(None, None)
+
+    # If UT is loaded, run the generator and remove the tracker tag so we're treated as a game client.
+    if tracker_loaded:
+        ctx.run_generator()
+        ctx.tags.discard("Tracker")
+
     ctx.server_task = asyncio.create_task(server_loop(ctx), name="server loop")
     ctx.repl_task = create_task_log_exception(ctx.run_repl_loop())
     ctx.memr_task = create_task_log_exception(ctx.run_memr_loop())

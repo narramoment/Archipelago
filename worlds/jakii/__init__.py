@@ -118,7 +118,26 @@ class JakIIWorld(World):
     orb_item_name: str = ""
     orb_item_id: int = 0
 
+    # Universal Tracker: allow regenerating this world from slot data, no YAML needed.
+    ut_can_gen_without_yaml = True
+
     def generate_early(self) -> None:
+        # Universal Tracker support: overwrite our options with the ones from the real seed's slot data.
+        if hasattr(self.multiworld, "re_gen_passthrough"):
+            if jak2_name in self.multiworld.re_gen_passthrough:
+                from .locs.mission_locations import main_mission_table
+                for key, val in self.multiworld.re_gen_passthrough[jak2_name].items():
+                    if key == "specific_mission_for_completion":
+                        # fill_slot_data converts mission_id -> GOAL task_id, so convert back for the option.
+                        for mid, miss in main_mission_table.items():
+                            if miss.task_id == val:
+                                val = mid
+                                break
+                    try:
+                        getattr(self.options, key).value = val
+                    except AttributeError:
+                        pass
+
         # Cache completion conditions and values.
         self.completion_type = self.options.jak_2_completion_condition.value  # Sorry about the naming here.
         if self.completion_type == options.CompletionCondition.option_complete_specific_mission:
