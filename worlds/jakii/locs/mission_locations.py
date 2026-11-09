@@ -330,108 +330,106 @@ main_tasks_to_missions = {miss.task_id: miss for _, miss in main_mission_table.i
 # ID numbers are precalculated and offset by 100 to distinguish them from main missions.
 side_mission_table = {
     # Orb Searches
-    101: Jak2SideMissionData(mission_id=101, task_id=78, name="Orb Search 1 (Computer #2)"),
-    102: Jak2SideMissionData(mission_id=102, task_id=79, name="Orb Search 2 (Computer #3)",
+    101: Jak2SideMissionData(mission_id=101, task_id=78, name="Orb Search 1"),
+    102: Jak2SideMissionData(mission_id=102, task_id=79, name="Orb Search 2",
                              rule=lambda state, player:
                              slums_to_port(state, player)),
-    103: Jak2SideMissionData(mission_id=103, task_id=80, name="Orb Search 3 (Computer #4)",
+    103: Jak2SideMissionData(mission_id=103, task_id=80, name="Orb Search 3",
                              rule=lambda state, player:
                              slums_to_port(state, player)),
-    104: Jak2SideMissionData(mission_id=104, task_id=81, name="Orb Search 4 (Computer #5)"),
-    105: Jak2SideMissionData(mission_id=105, task_id=85, name="Orb Search 5 (Computer #9)",
+    104: Jak2SideMissionData(mission_id=104, task_id=81, name="Orb Search 4"),
+    105: Jak2SideMissionData(mission_id=105, task_id=85, name="Orb Search 5",
                              rule=lambda state, player:
                              slums_to_market(state, player)),
-    106: Jak2SideMissionData(mission_id=106, task_id=86, name="Orb Search 6 (Computer #10)",
+    106: Jak2SideMissionData(mission_id=106, task_id=86, name="Orb Search 6",
                              rule=lambda state, player:
                              slums_to_market(state, player)),
-    107: Jak2SideMissionData(mission_id=107, task_id=88, name="Orb Search 7 (Computer #11)",
+    107: Jak2SideMissionData(mission_id=107, task_id=88, name="Orb Search 7",
                              rule=lambda state, player:
                              slums_to_market(state, player)),
-    108: Jak2SideMissionData(mission_id=108, task_id=89, name="Orb Search 8 (Computer #12)",
+    108: Jak2SideMissionData(mission_id=108, task_id=89, name="Orb Search 8",
                              rule=lambda state, player:
                              slums_to_market(state, player)),
-    109: Jak2SideMissionData(mission_id=109, task_id=90, name="Orb Search 9 (Computer #6)",
+    109: Jak2SideMissionData(mission_id=109, task_id=90, name="Orb Search 9",
                              rule=lambda state, player:
                              slums_to_stadium(state, player)),
-    110: Jak2SideMissionData(mission_id=110, task_id=92, name="Orb Search 10 (Computer #14)",
+    110: Jak2SideMissionData(mission_id=110, task_id=92, name="Orb Search 10",
                              rule=lambda state, player:
                              slums_to_port(state, player)),
-    111: Jak2SideMissionData(mission_id=111, task_id=93, name="Orb Search 11 (Computer #15)",
+    111: Jak2SideMissionData(mission_id=111, task_id=93, name="Orb Search 11",
                              rule=lambda state, player:
                              slums_to_stadium(state, player)),
-    112: Jak2SideMissionData(mission_id=112, task_id=95, name="Orb Search 12 (Computer #7)",
+    112: Jak2SideMissionData(mission_id=112, task_id=95, name="Orb Search 12",
                              rule=lambda state, player:
                              slums_to_market(state, player)),
-    113: Jak2SideMissionData(mission_id=113, task_id=97, name="Orb Search 13 (Computer #16)",
+    113: Jak2SideMissionData(mission_id=113, task_id=97, name="Orb Search 13",
                              rule=lambda state, player:
                              state.has("Green Security Pass", player)),
-    114: Jak2SideMissionData(mission_id=114, task_id=98, name="Orb Search 14 (Computer #17)",
+    114: Jak2SideMissionData(mission_id=114, task_id=98, name="Orb Search 14",
                              rule=lambda state, player:
                              slums_to_stadium(state, player)),
-    115: Jak2SideMissionData(mission_id=115, task_id=99, name="Orb Search 15 (Computer #18)",
+    115: Jak2SideMissionData(mission_id=115, task_id=99, name="Orb Search 15",
                              rule=lambda state, player:
                              slums_to_market(state, player)),
     # Ring Races
-    116: Jak2SideMissionData(mission_id=116, task_id=77, name="Ring Race 1 (Computer #1)"),
-    117: Jak2SideMissionData(mission_id=117, task_id=84, name="Ring Race 2 (Computer #8)",
+    116: Jak2SideMissionData(mission_id=116, task_id=77, name="Ring Race 1"),
+    117: Jak2SideMissionData(mission_id=117, task_id=84, name="Ring Race 2",
                              rule=lambda state, player:
                              slums_to_port(state, player)
                              and state.has("Yellow Security Pass", player)),
-    118: Jak2SideMissionData(mission_id=118, task_id=94, name="Ring Race 3 (Computer #1)",
+    118: Jak2SideMissionData(mission_id=118, task_id=94, name="Ring Race 3",
                              rule=lambda state, player:
                              state.has("Red Security Pass", player)),
     # Collect-em-alls
-    119: Jak2SideMissionData(mission_id=119, task_id=82, name="Collection 1 (Computer #6)",
+    119: Jak2SideMissionData(mission_id=119, task_id=82, name="Collection 1",
                              rule=lambda state, player:
                              slums_to_stadium(state, player)),
-    120: Jak2SideMissionData(mission_id=120, task_id=91, name="Collection 2 (Computer #13)",
+    120: Jak2SideMissionData(mission_id=120, task_id=91, name="Collection 2",
                              rule=lambda state, player:
                              slums_to_stadium(state, player)),
-    121: Jak2SideMissionData(mission_id=121, task_id=100, name="Collection 3 (Computer #12)",
+    121: Jak2SideMissionData(mission_id=121, task_id=100, name="Collection 3",
                              rule=lambda state, player:
                              slums_to_market(state, player)),
     # Missions Turned Side Missions
-    122: Jak2SideMissionData(mission_id=122, task_id=83, name="Make Delivery to Hideout Side Mission (Computer #7)",
+    122: Jak2SideMissionData(mission_id=122, task_id=83, name="Make Delivery to Hideout Side Mission",
                              rule=lambda state, player:
                              state.has_all(("Red Security Pass", "Yellow Security Pass"), player)),
-    123: Jak2SideMissionData(mission_id=123, task_id=87, name="Shuttle Underground Fighters Side Mission (Computer #7)",
+    123: Jak2SideMissionData(mission_id=123, task_id=87, name="Shuttle Underground Fighters Side Mission",
                              rule=lambda state, player:
                              state.has_all(("Red Security Pass", "Yellow Security Pass"), player)),
-    124: Jak2SideMissionData(mission_id=124, task_id=96, name="Destroy Blast Bots Side Mission (Computer #7)",
+    124: Jak2SideMissionData(mission_id=124, task_id=96, name="Destroy Blast Bots Side Mission",
                              rule=lambda state, player:
                              slums_to_market(state, player)
                              and state.has("Yellow Security Pass", player)),
     # Extra Race Missions
-    125: Jak2SideMissionData(mission_id=125, task_id=101,
-                             name="Beat Erol in Race Challenge (Side Mission, Near Hip Hog)",
+    125: Jak2SideMissionData(mission_id=125, task_id=101, name="Beat Erol in Race Challenge",
                              rule=lambda state, player:
                              slums_to_port(state, player)
                              and state.has("Yellow Security Pass", player)),
-    126: Jak2SideMissionData(mission_id=126, task_id=102,
-                             name="Port Race Side Mission (Near Port/Industrial Connection)",
+    126: Jak2SideMissionData(mission_id=126, task_id=102, name="Port Race Side Mission",
                              rule=lambda state, player:
                              slums_to_port(state, player)),
     # Stadium Challenges
-    127: Jak2SideMissionData(mission_id=127, task_id=103, name="JET-Board Stadium Challenge (Side Mission)",
+    127: Jak2SideMissionData(mission_id=127, task_id=103, name="JET-Board Stadium Challenge",
                              rule=lambda state, player:
                              state.has("JET-Board", player)
                              and slums_to_stadium(state, player)),
-    128: Jak2SideMissionData(mission_id=128, task_id=104, name="Class 3 Race (Side Mission, Stadium)",
+    128: Jak2SideMissionData(mission_id=128, task_id=104, name="Class 3 Race",
                              rule=lambda state, player:
                              slums_to_stadium(state, player)),
-    129: Jak2SideMissionData(mission_id=129, task_id=105, name="Class 2 Race (Side Mission, Stadium)",
+    129: Jak2SideMissionData(mission_id=129, task_id=105, name="Class 2 Race",
                              rule=lambda state, player:
                              slums_to_stadium(state, player)),
-    130: Jak2SideMissionData(mission_id=130, task_id=106, name="Class 1 Race (Side Mission, Stadium)",
+    130: Jak2SideMissionData(mission_id=130, task_id=106, name="Class 1 Race",
                              rule=lambda state, player:
                              slums_to_stadium(state, player)),
-    131: Jak2SideMissionData(mission_id=131, task_id=107, name="Class 3 Reverse Race (Stadium)",
+    131: Jak2SideMissionData(mission_id=131, task_id=107, name="Class 3 Reverse Race",
                              rule=lambda state, player:
                              slums_to_stadium(state, player)),
-    132: Jak2SideMissionData(mission_id=132, task_id=108, name="Class 2 Reverse Race (Stadium)",
+    132: Jak2SideMissionData(mission_id=132, task_id=108, name="Class 2 Reverse Race",
                              rule=lambda state, player:
                              slums_to_stadium(state, player)),
-    133: Jak2SideMissionData(mission_id=133, task_id=109, name="Class 1 Reverse Race (Stadium)",
+    133: Jak2SideMissionData(mission_id=133, task_id=109, name="Class 1 Reverse Race",
                              rule=lambda state, player:
                              slums_to_stadium(state, player))
 }
